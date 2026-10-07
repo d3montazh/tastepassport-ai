@@ -36,6 +36,53 @@ function reasonFor(entity: QlooEntity, mode: string) {
   return 'A balanced Qloo match combining familiarity with a little discovery.';
 }
 
+function demoItems(city: string, interests: string[], mode: string) {
+  const seed = interests[0] || 'your taste';
+  const second = interests[1] || 'your favorite culture';
+  const third = interests[2] || 'your style';
+
+  return [
+    {
+      name: `${city} listening room`,
+      type: 'Music · Culture',
+      reason: `Demo preview: a music-first stop inspired by ${seed}, chosen to start the route with a strong personal signal.`,
+      address: `Central ${city}`,
+    },
+    {
+      name: 'Independent design district',
+      type: 'Fashion · Neighborhood',
+      reason: `Demo preview: a neighborhood direction that translates the visual language of ${second} into local fashion and design.`,
+      address: `${city} design quarter`,
+    },
+    {
+      name: 'Late lunch, local twist',
+      type: 'Food',
+      reason: `Demo preview: food discovery influenced by ${third}, with the ${mode} discovery setting controlling how adventurous the match feels.`,
+      address: `${city} food district`,
+    },
+    {
+      name: 'Hidden cinema & gallery stop',
+      type: 'Film · Art',
+      reason: `Demo preview: a cross-domain stop connecting your entertainment taste with smaller cultural venues in ${city}.`,
+      address: `Creative ${city}`,
+    },
+    {
+      name: 'Golden-hour city texture',
+      type: 'Place · Photography',
+      reason: 'Demo preview: a visually distinctive place selected to match the mood and aesthetic patterns in your taste profile.',
+      address: `${city} viewpoint`,
+    },
+    {
+      name: 'After-dark wildcard',
+      type: 'Night · Discovery',
+      reason: mode === 'unexpected'
+        ? 'Demo preview: the wildcard stop intentionally reaches beyond your obvious preferences while staying culturally adjacent.'
+        : 'Demo preview: a comfortable final stop that keeps the route connected to your strongest preferences.',
+      address: `${city} after dark`,
+    },
+  ];
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -49,16 +96,27 @@ export async function POST(request: Request) {
 
     const apiKey = process.env.QLOO_API_KEY;
     const baseUrl = (process.env.QLOO_BASE_URL || 'https://api.qloo.com/v2').replace(/\/$/, '');
-
-    if (!apiKey) {
-      return NextResponse.json({ error: 'QLOO_API_KEY is missing. Add it to .env.local.' }, { status: 500 });
-    }
-
     const interests = likes
       .split(/[,\n]/)
       .map((x) => x.trim())
       .filter(Boolean)
       .slice(0, 8);
+
+    // Temporary transparent fallback so the product can be previewed while
+    // Qloo access is under maintenance. It is intentionally labelled Demo mode
+    // and is replaced automatically as soon as QLOO_API_KEY is configured.
+    if (!apiKey) {
+      const items = demoItems(city, interests, mode);
+      return NextResponse.json({
+        summary: `${city}, translated through ${interests.slice(0, 3).join(', ')}${interests.length > 3 ? '…' : ''}`,
+        items,
+        meta: {
+          source: 'Demo mode · add QLOO_API_KEY for live Qloo data',
+          mode,
+          matched: items.length,
+        },
+      });
+    }
 
     const popularityMax = mode === 'unexpected' ? 0.82 : undefined;
     const take = 8;
