@@ -1,0 +1,86 @@
+/* Cursor-reactive Taste DNA sphere. Kept subtle so the hero still feels premium. */
+
+@keyframes slimeBreathe {
+  0%, 100% {
+    border-radius: 50% 48% 52% 49% / 48% 52% 49% 51%;
+    box-shadow:
+      0 0 100px rgba(114,132,255,var(--blob-glow,.32)),
+      inset 0 0 35px rgba(255,255,255,.55);
+  }
+  50% {
+    border-radius: 47% 53% 49% 51% / 53% 47% 52% 48%;
+    box-shadow:
+      0 0 126px rgba(130,111,255,var(--blob-glow,.4)),
+      inset 0 0 43px rgba(255,255,255,.63);
+  }
+}
+
+@keyframes slimeRingOne {
+  from { transform: translate3d(var(--ring-x,0px),var(--ring-y,0px),0) rotate(0deg); }
+  to { transform: translate3d(var(--ring-x,0px),var(--ring-y,0px),0) rotate(360deg); }
+}
+
+@keyframes slimeRingTwo {
+  from { transform: translate3d(var(--ring-outer-x,0px),var(--ring-outer-y,0px),0) rotate(0deg); }
+  to { transform: translate3d(var(--ring-outer-x,0px),var(--ring-outer-y,0px),0) rotate(-360deg); }
+}
+
+.taste-orbit {
+  --blob-x: 0px;
+  --blob-y: 0px;
+  --blob-sx: 1;
+  --blob-sy: 1;
+  --blob-glow: .32;
+  --ring-x: 0px;
+  --ring-y: 0px;
+  --ring-outer-x: 0px;
+  --ring-outer-y: 0px;
+}
+
+.orbit-core {
+  transform: translate3d(var(--blob-x),var(--blob-y),0) scaleX(var(--blob-sx)) scaleY(var(--blob-sy));
+  animation: slimeBreathe 4.8s ease-in-out infinite;
+  will-change: transform,border-radius,box-shadow;
+  transition: box-shadow .18s ease;
+}
+
+.orbit-core::after {
+  content: '';
+  position: absolute;
+  width: 35%;
+  height: 23%;
+  left: 21%;
+  top: 17%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse,rgba(255,255,255,.36),rgba(255,255,255,0) 72%);
+  filter: blur(4px);
+  pointer-events: none;
+}
+
+.ring-one {
+  animation: slimeRingOne 26s linear infinite;
+  will-change: transform;
+}
+
+.ring-two {
+  animation: slimeRingTwo 40s linear infinite;
+  will-change: transform;
+}
+
+@media (hover:hover) and (pointer:fine) {
+  .hero-grid:hover .orbit-core {
+    box-shadow:
+      0 0 118px rgba(120,137,255,var(--blob-glow,.38)),
+      inset 0 0 38px rgba(255,255,255,.58);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .orbit-core {
+    transform: none !important;
+    border-radius: 50% !important;
+  }
+  .ring-one,.ring-two {
+    transform: none !important;
+  }
+}
