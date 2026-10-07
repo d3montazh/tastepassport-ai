@@ -1,6 +1,7 @@
 import './globals.css';
 import './enhancements.css';
 import './animations.css';
+import './cursor-blob.css';
 import ScrollEffects from './scroll-effects';
 
 export const metadata = {
