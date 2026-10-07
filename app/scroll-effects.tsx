@@ -9,6 +9,7 @@ const revealSelectors = [
   '.agent-note',
   '.route-refiner',
   '.taste-dna-card',
+  '.taste-map-card',
   '.route-card',
   '.how-it-works .section-kicker',
   '.feature-card',
