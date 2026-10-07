@@ -39,6 +39,8 @@ The agent turns that into a sequenced cultural route and explains the **taste br
 - Interactive **More like me** replacement for a single stop
 - Interactive **Surprise me more** replacement for a single stop
 - Single-stop adaptation without rebuilding the rest of the route
+- **Natural-language full-route refinement** such as “Make it less touristy”, “More fashion-focused”, “Make it cheaper”, or “More nightlife”
+- Full-route refinement preserves the time structure while rebalancing the day around the user’s instruction
 - Responsive dark UI for desktop and mobile
 - Public Vercel deployment
 - Transparent fallback Demo Mode while API access is unavailable
@@ -52,7 +54,9 @@ After the initial route is generated, the user can adapt individual stops:
 - **More like me** pulls one stop closer to the strongest taste signals.
 - **Surprise me more** widens the discovery radius for one stop.
 
-The rest of the day remains intact, so the agent is making a targeted plan revision rather than regenerating everything from scratch.
+The user can also talk to the full route in plain English. Prompts such as **“Make it less touristy”**, **“More fashion-focused”**, **“Make it cheaper”**, or **“More nightlife”** rebalance the whole day while preserving the route’s morning-to-night structure and the original Taste DNA.
+
+This creates two levels of control: targeted single-stop changes and higher-level whole-route direction.
 
 ## Qloo integration
 
@@ -82,6 +86,7 @@ app/
   api/
     recommend/   # builds the main route
     replace/     # adapts a single stop
+    refine/      # refines the full route from a natural-language instruction
   page.tsx       # interactive client experience
   globals.css
   enhancements.css
