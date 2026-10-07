@@ -1,0 +1,217 @@
+/* TastePassport motion system — intentionally subtle and presentation-focused. */
+
+@keyframes topbarIn {
+  from { opacity: 0; transform: translateY(-12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes heroRise {
+  from { opacity: 0; transform: translateY(24px); filter: blur(6px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+
+@keyframes orbitIntro {
+  from { opacity: 0; transform: scale(.92); filter: blur(10px); }
+  to { opacity: 1; transform: scale(1); filter: blur(0); }
+}
+
+@keyframes ringSpin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes ringSpinReverse {
+  to { transform: rotate(-360deg); }
+}
+
+@keyframes coreBreathe {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 100px rgba(114,132,255,.32), inset 0 0 35px rgba(255,255,255,.55); }
+  50% { transform: scale(1.035); box-shadow: 0 0 125px rgba(130,111,255,.42), inset 0 0 42px rgba(255,255,255,.62); }
+}
+
+@keyframes chipFloat {
+  0%, 100% { transform: translate3d(0,0,0); }
+  50% { transform: translate3d(0,-7px,0); }
+}
+
+@keyframes ambientDriftOne {
+  0%, 100% { transform: translate3d(0,0,0) scale(1); }
+  50% { transform: translate3d(42px,24px,0) scale(1.08); }
+}
+
+@keyframes ambientDriftTwo {
+  0%, 100% { transform: translate3d(0,0,0) scale(1); }
+  50% { transform: translate3d(-36px,32px,0) scale(.94); }
+}
+
+@keyframes arrowPulse {
+  0%, 100% { opacity: .48; }
+  50% { opacity: 1; text-shadow: 0 0 18px rgba(147,164,210,.55); }
+}
+
+@keyframes agentPulse {
+  0%, 100% { box-shadow: 0 0 12px rgba(157,172,255,.55); }
+  50% { box-shadow: 0 0 26px rgba(157,172,255,1); }
+}
+
+@keyframes buttonSheen {
+  0% { transform: translateX(-160%) skewX(-18deg); }
+  55%, 100% { transform: translateX(260%) skewX(-18deg); }
+}
+
+.topbar {
+  animation: topbarIn .65s cubic-bezier(.22,.8,.22,1) both;
+}
+
+.hero-copy .eyebrow {
+  animation: heroRise .7s .08s cubic-bezier(.22,.8,.22,1) both;
+}
+
+.hero-copy h1 {
+  animation: heroRise .82s .16s cubic-bezier(.22,.8,.22,1) both;
+}
+
+.hero-copy .lead {
+  animation: heroRise .82s .27s cubic-bezier(.22,.8,.22,1) both;
+}
+
+.hero-points {
+  animation: heroRise .82s .38s cubic-bezier(.22,.8,.22,1) both;
+}
+
+.taste-orbit {
+  animation: orbitIntro 1s .18s cubic-bezier(.22,.8,.22,1) both;
+}
+
+.ring-one {
+  animation: ringSpin 26s linear infinite;
+}
+
+.ring-two {
+  animation: ringSpinReverse 40s linear infinite;
+}
+
+.orbit-core {
+  animation: coreBreathe 4.8s ease-in-out infinite;
+}
+
+.orbit-chip {
+  animation: chipFloat 4.2s ease-in-out infinite;
+}
+
+.chip-b { animation-delay: -.8s; }
+.chip-c { animation-delay: -1.7s; }
+.chip-d { animation-delay: -2.5s; }
+.chip-e { animation-delay: -3.2s; }
+
+.ambient-one { animation: ambientDriftOne 18s ease-in-out infinite; }
+.ambient-two { animation: ambientDriftTwo 21s ease-in-out infinite; }
+
+.translation-signals i {
+  animation: arrowPulse 1.8s ease-in-out infinite;
+}
+
+.agent-dot {
+  animation: agentPulse 2s ease-in-out infinite;
+}
+
+.primary {
+  position: relative;
+  overflow: hidden;
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+
+.primary::after {
+  content: '';
+  position: absolute;
+  inset: -30% auto -30% -28%;
+  width: 18%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.72), transparent);
+  animation: buttonSheen 4.8s 1.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 42px rgba(101,120,255,.23);
+}
+
+/* Elements become animated only after the client observer registers them. */
+.scroll-reveal {
+  opacity: 0;
+  transform: translate3d(0,28px,0) scale(.988);
+  filter: blur(5px);
+  transition:
+    opacity .72s cubic-bezier(.22,.8,.22,1),
+    transform .72s cubic-bezier(.22,.8,.22,1),
+    filter .72s ease,
+    border-color .2s ease,
+    box-shadow .2s ease;
+  transition-delay: var(--reveal-delay, 0ms);
+  will-change: opacity, transform, filter;
+}
+
+.scroll-reveal.is-visible {
+  opacity: 1;
+  transform: translate3d(0,0,0) scale(1);
+  filter: blur(0);
+}
+
+.route-card.scroll-reveal {
+  transform: translate3d(0,22px,0) scale(.99);
+}
+
+.route-card.scroll-reveal.is-visible {
+  transform: translate3d(0,0,0) scale(1);
+}
+
+.route-card.scroll-reveal.is-visible:hover {
+  transform: translate3d(0,-4px,0) scale(1.004);
+  border-color: #35425a;
+  box-shadow: 0 18px 48px rgba(0,0,0,.22);
+}
+
+.feature-card.scroll-reveal.is-visible:hover {
+  transform: translate3d(0,-4px,0);
+  border-color: #35425a;
+  box-shadow: 0 18px 42px rgba(0,0,0,.18);
+}
+
+.taste-tags span,
+.dna-tags span,
+.translation-signals span,
+.refiner-presets button,
+.agent-actions button,
+.mode-option,
+.ghost-button {
+  transition: transform .18s ease, border-color .18s ease, background .18s ease, color .18s ease, box-shadow .18s ease;
+}
+
+.taste-tags span:hover,
+.dna-tags span:hover,
+.translation-signals span:hover {
+  transform: translateY(-2px);
+  border-color: #4a5c86;
+}
+
+.mode-option:hover,
+.ghost-button:hover,
+.refiner-presets button:hover,
+.agent-actions button:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+
+  .scroll-reveal,
+  .scroll-reveal.is-visible {
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+    transition: none !important;
+  }
+}
