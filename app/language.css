@@ -1,0 +1,83 @@
+.topbar-actions{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+.language-picker{
+  height:38px;
+  display:flex;
+  align-items:center;
+  gap:7px;
+  padding:0 10px;
+  border:1px solid #283348;
+  border-radius:999px;
+  background:rgba(10,14,21,.72);
+  color:#aab6cf;
+  transition:border-color .2s ease,background .2s ease,transform .2s ease;
+}
+
+.language-picker:hover{
+  border-color:#3d4d6d;
+  background:#101722;
+  transform:translateY(-1px);
+}
+
+.language-icon{
+  font-size:12px;
+  color:#8ea2df;
+}
+
+.language-picker select{
+  appearance:none;
+  border:0;
+  outline:0;
+  background:transparent;
+  color:#d8e0ef;
+  font:inherit;
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:.04em;
+  cursor:pointer;
+  min-width:72px;
+}
+
+.language-picker select option{
+  background:#0d121a;
+  color:#e6ebf5;
+}
+
+@media(max-width:760px){
+  .topbar{
+    gap:10px;
+  }
+
+  .topbar-actions{
+    gap:6px;
+  }
+
+  .language-picker{
+    height:34px;
+    padding:0 8px;
+  }
+
+  .language-picker select{
+    min-width:48px;
+    max-width:78px;
+    font-size:9px;
+  }
+
+  .topbar-actions .nav-pill{
+    display:none;
+  }
+}
+
+@media(max-width:430px){
+  .brand>div:last-child span{
+    display:none;
+  }
+
+  .language-picker{
+    max-width:96px;
+  }
+}
