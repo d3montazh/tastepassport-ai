@@ -52,6 +52,13 @@ const surpriseSeeds = [
   },
 ];
 
+const refinePresets = [
+  'Make it less touristy',
+  'More fashion-focused',
+  'Make it cheaper',
+  'More nightlife',
+];
+
 const modeCopy: Record<Mode, { label: string; note: string }> = {
   safe: {
     label: 'Safe',
@@ -77,6 +84,8 @@ export default function Home() {
   const [error, setError] = useState('');
   const [replacing, setReplacing] = useState<{ index: number; style: ReplacementStyle } | null>(null);
   const [agentMessage, setAgentMessage] = useState('');
+  const [refineInstruction, setRefineInstruction] = useState('Make it less touristy');
+  const [refining, setRefining] = useState(false);
 
   const tasteTags = useMemo(
     () =>
@@ -177,6 +186,51 @@ export default function Home() {
       setError(e.message || 'Could not replace this stop');
     } finally {
       setReplacing(null);
+    }
+  }
+
+  async function refineRoute() {
+    if (!result?.items?.length || !refineInstruction.trim()) return;
+
+    setRefining(true);
+    setError('');
+    setAgentMessage('');
+
+    try {
+      const res = await fetch('/api/refine', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          likes,
+          origin,
+          city,
+          mode,
+          instruction: refineInstruction.trim(),
+          currentItems: result.items,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not refine the route');
+
+      setResult((current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          items: data.items || current.items,
+          meta: {
+            ...current.meta,
+            strategy: data?.meta?.strategy || `Agent refined the whole route around: “${refineInstruction.trim()}”`,
+          },
+        };
+      });
+
+      setAgentMessage(
+        data?.meta?.note || `Full route adapted around: “${refineInstruction.trim()}”.`,
+      );
+    } catch (e: any) {
+      setError(e.message || 'Could not refine the route');
+    } finally {
+      setRefining(false);
     }
   }
 
@@ -352,6 +406,43 @@ export default function Home() {
             <div className="agent-mode">{modeCopy[mode].label}</div>
           </div>
 
+          <div className={`route-refiner ${refining ? 'is-refining' : ''}`}>
+            <div className="refiner-copy">
+              <span>Talk to your route</span>
+              <strong>Refine the whole day in plain English.</strong>
+              <p>Ask for a different vibe without rebuilding your Taste DNA or losing the route structure.</p>
+            </div>
+            <div className="refiner-controls">
+              <div className="refiner-input-wrap">
+                <span>✦</span>
+                <input
+                  value={refineInstruction}
+                  onChange={(e) => setRefineInstruction(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !refining) refineRoute();
+                  }}
+                  placeholder="Make it less touristy, more fashion-focused, cheaper..."
+                  aria-label="Route refinement instruction"
+                />
+                <button type="button" onClick={refineRoute} disabled={refining || !refineInstruction.trim()}>
+                  {refining ? 'Refining…' : 'Refine route'}
+                </button>
+              </div>
+              <div className="refiner-presets">
+                {refinePresets.map((preset) => (
+                  <button
+                    type="button"
+                    key={preset}
+                    className={refineInstruction === preset ? 'active' : ''}
+                    onClick={() => setRefineInstruction(preset)}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
           <div className="taste-dna-card">
             <div className="dna-label">Your current Taste DNA</div>
             <div className="dna-tags">
@@ -391,7 +482,7 @@ export default function Home() {
                       <div>
                         <button
                           type="button"
-                          disabled={isReplacing}
+                          disabled={isReplacing || refining}
                           onClick={() => replaceStop(i, 'closer')}
                         >
                           {isReplacing && replacing?.style === 'closer' ? 'Adapting…' : 'More like me'}
@@ -399,7 +490,7 @@ export default function Home() {
                         <button
                           type="button"
                           className="surprise-action"
-                          disabled={isReplacing}
+                          disabled={isReplacing || refining}
                           onClick={() => replaceStop(i, 'surprise')}
                         >
                           {isReplacing && replacing?.style === 'surprise' ? 'Exploring…' : 'Surprise me more'}
@@ -430,7 +521,7 @@ export default function Home() {
           <div className="feature-card">
             <span>03</span>
             <h3>Agentic adaptation</h3>
-            <p>Users can refine one stop without rebuilding the entire day — asking the agent to move closer to their taste or deliberately push further out.</p>
+            <p>Refine one stop or reshape the whole day in natural language without losing the route structure or your original Taste DNA.</p>
           </div>
         </div>
       </section>
