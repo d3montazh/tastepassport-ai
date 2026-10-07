@@ -9,6 +9,10 @@ type ResultItem = {
   type?: string;
   reason?: string;
   address?: string | null;
+  time?: string;
+  phase?: string;
+  bridge?: string;
+  fit?: number;
 };
 
 type ResultPayload = {
@@ -18,24 +22,31 @@ type ResultPayload = {
     source?: string;
     mode?: string;
     matched?: number;
+    origin?: string;
+    destination?: string;
+    strategy?: string;
   };
 };
 
 const surpriseSeeds = [
   {
     likes: 'Frank Ocean, Blade Runner 2049, A-COLD-WALL*, ramen, brutalist architecture',
+    origin: 'London',
     city: 'Tokyo',
   },
   {
     likes: 'The Weeknd, Drive, vintage Prada, espresso bars, neon photography',
+    origin: 'Toronto',
     city: 'Milan',
   },
   {
     likes: 'Travis Scott, Interstellar, Stone Island, Japanese food, underground clubs',
+    origin: 'Kyiv',
     city: 'New York',
   },
   {
     likes: 'Arctic Monkeys, The Grand Budapest Hotel, old bookstores, natural wine, minimal fashion',
+    origin: 'Berlin',
     city: 'Paris',
   },
 ];
@@ -57,6 +68,7 @@ const modeCopy: Record<Mode, { label: string; note: string }> = {
 
 export default function Home() {
   const [likes, setLikes] = useState('Travis Scott, Interstellar, Stone Island, Japanese food');
+  const [origin, setOrigin] = useState('Kyiv');
   const [city, setCity] = useState('New York');
   const [mode, setMode] = useState<Mode>('balanced');
   const [loading, setLoading] = useState(false);
@@ -74,10 +86,11 @@ export default function Home() {
   );
 
   function surpriseMe() {
-    const current = `${likes}|${city}`;
-    const options = surpriseSeeds.filter((seed) => `${seed.likes}|${seed.city}` !== current);
+    const current = `${likes}|${origin}|${city}`;
+    const options = surpriseSeeds.filter((seed) => `${seed.likes}|${seed.origin}|${seed.city}` !== current);
     const next = options[Math.floor(Math.random() * options.length)] || surpriseSeeds[0];
     setLikes(next.likes);
+    setOrigin(next.origin);
     setCity(next.city);
     setMode('unexpected');
     setResult(null);
@@ -93,11 +106,14 @@ export default function Home() {
       const res = await fetch('/api/recommend', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ likes, city, mode }),
+        body: JSON.stringify({ likes, origin, city, mode }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Something went wrong');
       setResult(data);
+      requestAnimationFrame(() => {
+        document.getElementById('results')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
     } catch (e: any) {
       setError(e.message || 'Something went wrong');
     } finally {
@@ -129,13 +145,13 @@ export default function Home() {
             <span> your own taste.</span>
           </h1>
           <p className="lead">
-            TastePassport turns the music, movies, fashion and food you love into a personalized cultural route — built around you, not generic tourist rankings.
+            TastePassport translates the music, movies, fashion and food you love into a personalized cultural route — built around you, not generic tourist rankings.
           </p>
 
           <div className="hero-points">
             <div><b>01</b><span>Read your taste DNA</span></div>
-            <div><b>02</b><span>Translate it into a city</span></div>
-            <div><b>03</b><span>Discover unexpected matches</span></div>
+            <div><b>02</b><span>Translate it across cities</span></div>
+            <div><b>03</b><span>Sequence a day around you</span></div>
           </div>
         </div>
 
@@ -179,15 +195,32 @@ export default function Home() {
               {tasteTags.map((tag) => <span key={tag}>{tag}</span>)}
             </div>
 
-            <label htmlFor="city">Where are you going?</label>
-            <div className="city-input-wrap">
-              <span>⌖</span>
-              <input
-                id="city"
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                placeholder="Tokyo, New York, Paris..."
-              />
+            <div className="city-pair">
+              <div>
+                <label htmlFor="origin">Your taste comes from</label>
+                <div className="city-input-wrap">
+                  <span>◎</span>
+                  <input
+                    id="origin"
+                    value={origin}
+                    onChange={(e) => setOrigin(e.target.value)}
+                    placeholder="Kyiv, London, Seoul..."
+                  />
+                </div>
+              </div>
+              <div className="translate-arrow">→</div>
+              <div>
+                <label htmlFor="city">Translate it into</label>
+                <div className="city-input-wrap">
+                  <span>⌖</span>
+                  <input
+                    id="city"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    placeholder="Tokyo, New York, Paris..."
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
@@ -214,7 +247,7 @@ export default function Home() {
               {loading ? (
                 <><span className="spinner" /> Mapping your taste…</>
               ) : (
-                <>Build my TastePassport <span>→</span></>
+                <>Translate my taste <span>→</span></>
               )}
             </button>
 
@@ -236,6 +269,30 @@ export default function Home() {
             </div>
           </div>
 
+          <div className="translation-map">
+            <div className="translation-city">
+              <span>FROM</span>
+              <strong>{result.meta?.origin || origin || 'Your world'}</strong>
+            </div>
+            <div className="translation-signals">
+              {tasteTags.slice(0, 4).map((tag) => <span key={tag}>{tag}</span>)}
+              <i>→</i>
+            </div>
+            <div className="translation-city destination">
+              <span>INTO</span>
+              <strong>{result.meta?.destination || city}</strong>
+            </div>
+          </div>
+
+          <div className="agent-note">
+            <span className="agent-dot" />
+            <div>
+              <b>Agent route strategy</b>
+              <p>{result.meta?.strategy || 'Cross-domain taste signals sequenced into a morning-to-night cultural route.'}</p>
+            </div>
+            <div className="agent-mode">{modeCopy[mode].label}</div>
+          </div>
+
           <div className="taste-dna-card">
             <div className="dna-label">Your current Taste DNA</div>
             <div className="dna-tags">
@@ -252,13 +309,20 @@ export default function Home() {
                   <i />
                 </div>
                 <div className="route-body">
-                  <div className="type">{item.type || 'Discovery'}</div>
+                  <div className="route-time-row">
+                    <div className="type">{item.type || 'Discovery'}</div>
+                    {(item.time || item.phase) && (
+                      <div className="time-pill">{item.time || ''}{item.phase ? ` · ${item.phase}` : ''}</div>
+                    )}
+                  </div>
                   <h3>{item.name}</h3>
                   {item.address && <div className="address">⌖ {item.address}</div>}
                   <p>{item.reason || 'A Qloo-powered match connected to your taste profile.'}</p>
+                  {item.bridge && <div className="bridge"><span>taste bridge</span>{item.bridge}</div>}
                   <div className="match-row">
-                    <span>Why it fits</span>
-                    <div className="match-bar"><i style={{ width: `${Math.max(62, 92 - i * 5)}%` }} /></div>
+                    <span>Route fit</span>
+                    <div className="match-bar"><i style={{ width: `${item.fit ?? Math.max(62, 92 - i * 5)}%` }} /></div>
+                    <b>{item.fit ?? Math.max(62, 92 - i * 5)}%</b>
                   </div>
                 </div>
               </article>
@@ -277,13 +341,13 @@ export default function Home() {
           </div>
           <div className="feature-card">
             <span>02</span>
-            <h3>Explainable discovery</h3>
-            <p>Each recommendation tells you why it belongs in your route instead of giving you another opaque top-10 list.</p>
+            <h3>Taste translation</h3>
+            <p>It does not just recommend what is popular in a city. It asks what the local equivalent of your existing cultural identity could be.</p>
           </div>
           <div className="feature-card">
             <span>03</span>
-            <h3>Controlled serendipity</h3>
-            <p>Move from Safe to Unexpected and deliberately decide how adventurous your recommendations should feel.</p>
+            <h3>Agentic sequencing</h3>
+            <p>Matches are organized into a usable morning-to-night route instead of dropped into an unstructured recommendation list.</p>
           </div>
         </div>
       </section>
