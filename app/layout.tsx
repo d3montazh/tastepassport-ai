@@ -2,6 +2,7 @@ import './globals.css';
 import './enhancements.css';
 import './animations.css';
 import './cursor-blob.css';
+import './taste-map.css';
 import ScrollEffects from './scroll-effects';
 
 export const metadata = {
