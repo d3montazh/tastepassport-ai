@@ -3,7 +3,9 @@ import './enhancements.css';
 import './animations.css';
 import './cursor-blob.css';
 import './taste-map.css';
+import './mobile-polish.css';
 import ScrollEffects from './scroll-effects';
+import ResultsActions from './results-actions';
 
 export const metadata = {
   title: 'TastePassport AI',
@@ -16,6 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         {children}
         <ScrollEffects />
+        <ResultsActions />
       </body>
     </html>
   );
