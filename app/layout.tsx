@@ -1,4 +1,5 @@
 import './globals.css';
+import './enhancements.css';
 
 export const metadata = {
   title: 'TastePassport AI',
