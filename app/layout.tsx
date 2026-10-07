@@ -7,6 +7,7 @@ import './mobile-polish.css';
 import './language.css';
 import ScrollEffects from './scroll-effects';
 import ResultsActions from './results-actions';
+import LanguagePickerEnhancer from './language-picker-enhancer';
 
 export const metadata = {
   title: 'TastePassport AI',
@@ -20,6 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {children}
         <ScrollEffects />
         <ResultsActions />
+        <LanguagePickerEnhancer />
       </body>
     </html>
   );
