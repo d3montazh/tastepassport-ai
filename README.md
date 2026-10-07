@@ -44,6 +44,8 @@ The agent turns that into a sequenced cultural route and explains the **taste br
 - **Natural-language full-route refinement** such as “Make it less touristy”, “More fashion-focused”, “Make it cheaper”, or “More nightlife”
 - Full-route refinement preserves the time structure while rebalancing the day around the user’s instruction
 - Responsive dark UI with scroll motion and cursor-reactive Taste DNA visualization
+- Mobile-specific layout polish for the builder, loading flow, route cards, Taste Map and agent controls
+- **Build another passport** action after the generated route
 - Public Vercel deployment
 - Transparent fallback Demo Mode while API access is unavailable
 
@@ -90,15 +92,18 @@ API keys are never committed to the repository.
 ```text
 app/
   api/
-    recommend/   # builds the main route
-    replace/     # adapts a single stop
-    refine/      # refines the full route from a natural-language instruction
-  page.tsx       # interactive client experience
+    recommend/       # builds the main route
+    replace/         # adapts a single stop
+    refine/          # refines the full route from a natural-language instruction
+  page.tsx           # interactive client experience
+  scroll-effects.tsx # reveal motion + cursor interaction
+  results-actions.tsx# build-another-passport results action
   globals.css
   enhancements.css
   animations.css
   cursor-blob.css
   taste-map.css
+  mobile-polish.css
 ```
 
 ## Run locally
