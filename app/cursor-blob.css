@@ -38,6 +38,8 @@
 }
 
 .orbit-core {
+  position: relative;
+  overflow: hidden;
   transform: translate3d(var(--blob-x),var(--blob-y),0) scaleX(var(--blob-sx)) scaleY(var(--blob-sy));
   animation: slimeBreathe 4.8s ease-in-out infinite;
   will-change: transform,border-radius,box-shadow;
