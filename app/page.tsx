@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { languages, normalizeLocale, uiCopy, type Locale } from './i18n';
 
 type Mode = 'safe' | 'balanced' | 'unexpected';
 type ReplacementStyle = 'closer' | 'surprise';
@@ -52,36 +53,9 @@ const surpriseSeeds = [
   },
 ];
 
-const refinePresets = [
-  'Make it less touristy',
-  'More fashion-focused',
-  'Make it cheaper',
-  'More nightlife',
-];
-
-const loadingSteps = [
-  { label: 'Reading your Taste DNA', short: 'Taste DNA' },
-  { label: 'Mapping cross-domain signals', short: 'Signals' },
-  { label: 'Translating culture between cities', short: 'Translate' },
-  { label: 'Building your cultural route', short: 'Route' },
-];
-
-const modeCopy: Record<Mode, { label: string; note: string }> = {
-  safe: {
-    label: 'Safe',
-    note: 'High-confidence matches close to what you already love.',
-  },
-  balanced: {
-    label: 'Balanced',
-    note: 'Familiar taste with just enough discovery to feel fresh.',
-  },
-  unexpected: {
-    label: 'Unexpected',
-    note: 'Pushes further into surprising cross-domain connections.',
-  },
-};
-
 export default function Home() {
+  const [locale, setLocale] = useState<Locale>('en');
+  const t = uiCopy[locale];
   const [likes, setLikes] = useState('Travis Scott, Interstellar, Stone Island, Japanese food');
   const [origin, setOrigin] = useState('Kyiv');
   const [city, setCity] = useState('New York');
@@ -93,8 +67,28 @@ export default function Home() {
   const [error, setError] = useState('');
   const [replacing, setReplacing] = useState<{ index: number; style: ReplacementStyle } | null>(null);
   const [agentMessage, setAgentMessage] = useState('');
-  const [refineInstruction, setRefineInstruction] = useState('Make it less touristy');
+  const [refineInstruction, setRefineInstruction] = useState(t.presets[0]);
   const [refining, setRefining] = useState(false);
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem('tastepassport-locale');
+    const browserLocale = navigator.language || 'en';
+    const next = normalizeLocale(saved || browserLocale);
+    setLocale(next);
+    setRefineInstruction(uiCopy[next].presets[0]);
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.lang = locale === 'uk' ? 'uk' : locale === 'zh' ? 'zh-CN' : locale;
+    window.localStorage.setItem('tastepassport-locale', locale);
+    window.dispatchEvent(new CustomEvent('tastepassport:language', { detail: locale }));
+  }, [locale]);
+
+  const modeCopy: Record<Mode, { label: string; note: string }> = {
+    safe: { label: t.safe, note: t.safeNote },
+    balanced: { label: t.balanced, note: t.balancedNote },
+    unexpected: { label: t.unexpected, note: t.unexpectedNote },
+  };
 
   const tasteTags = useMemo(
     () =>
@@ -109,18 +103,25 @@ export default function Home() {
   const tasteMapLinks = useMemo(() => {
     const items = result?.items || [];
     if (!items.length) return [];
-    const signals = tasteTags.length ? tasteTags : ['Your Taste DNA'];
+    const signals = tasteTags.length ? tasteTags : ['Taste DNA'];
 
     return items.slice(0, 6).map((item, index) => {
       const bridgeSignal = item.bridge?.split('→')?.[0]?.trim();
       return {
         signal: bridgeSignal || signals[index % signals.length],
         target: item.name,
-        type: item.type || 'Discovery',
+        type: item.type || t.discoveryFallback,
         fit: item.fit ?? Math.max(62, 92 - index * 5),
       };
     });
-  }, [result, tasteTags]);
+  }, [result, tasteTags, t.discoveryFallback]);
+
+  function changeLanguage(nextLocale: Locale) {
+    setLocale(nextLocale);
+    setRefineInstruction(uiCopy[nextLocale].presets[0]);
+    setError('');
+    setAgentMessage('');
+  }
 
   function surpriseMe() {
     const current = `${likes}|${origin}|${city}`;
@@ -146,7 +147,7 @@ export default function Home() {
     const startedAt = Date.now();
     let stage = 0;
     const loadingTimer = window.setInterval(() => {
-      stage = Math.min(stage + 1, loadingSteps.length - 1);
+      stage = Math.min(stage + 1, t.loadingSteps.length - 1);
       setLoadingStage(stage);
       setLoadingProgress([14, 39, 67, 88][stage] || 88);
     }, 520);
@@ -155,16 +156,16 @@ export default function Home() {
       const res = await fetch('/api/recommend', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ likes, origin, city, mode }),
+        body: JSON.stringify({ likes, origin, city, mode, locale }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Something went wrong');
+      if (!res.ok) throw new Error(data.error || t.errorGeneric);
 
       const remaining = Math.max(0, 1850 - (Date.now() - startedAt));
       if (remaining) await new Promise((resolve) => window.setTimeout(resolve, remaining));
 
       window.clearInterval(loadingTimer);
-      setLoadingStage(loadingSteps.length - 1);
+      setLoadingStage(t.loadingSteps.length - 1);
       setLoadingProgress(100);
       await new Promise((resolve) => window.setTimeout(resolve, 220));
 
@@ -173,7 +174,7 @@ export default function Home() {
         document.getElementById('results')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
     } catch (e: any) {
-      setError(e.message || 'Something went wrong');
+      setError(e.message || t.errorGeneric);
     } finally {
       window.clearInterval(loadingTimer);
       setLoading(false);
@@ -197,6 +198,7 @@ export default function Home() {
           origin,
           city,
           mode,
+          locale,
           index,
           replacementStyle,
           currentItem: result.items[index],
@@ -204,7 +206,7 @@ export default function Home() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not replace this stop');
+      if (!res.ok) throw new Error(data.error || t.errorReplace);
 
       setResult((current) => {
         if (!current?.items) return current;
@@ -215,21 +217,17 @@ export default function Home() {
           items: nextItems,
           meta: {
             ...current.meta,
-            strategy: replacementStyle === 'surprise'
-              ? 'Agent adapted one stop with a wider discovery radius while preserving the rest of the day.'
-              : 'Agent adapted one stop toward your strongest taste signals while preserving the rest of the day.',
+            strategy: replacementStyle === 'surprise' ? t.strategySurprise : t.strategyCloser,
           },
         };
       });
 
       setAgentMessage(
         data?.meta?.note ||
-          (replacementStyle === 'surprise'
-            ? `Stop ${String(index + 1).padStart(2, '0')} was made more unexpected.`
-            : `Stop ${String(index + 1).padStart(2, '0')} was pulled closer to your Taste DNA.`),
+          `${String(index + 1).padStart(2, '0')} ${replacementStyle === 'surprise' ? t.stopUnexpected : t.stopCloser}`,
       );
     } catch (e: any) {
-      setError(e.message || 'Could not replace this stop');
+      setError(e.message || t.errorReplace);
     } finally {
       setReplacing(null);
     }
@@ -251,12 +249,13 @@ export default function Home() {
           origin,
           city,
           mode,
+          locale,
           instruction: refineInstruction.trim(),
           currentItems: result.items,
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not refine the route');
+      if (!res.ok) throw new Error(data.error || t.errorRefine);
 
       setResult((current) => {
         if (!current) return current;
@@ -265,16 +264,14 @@ export default function Home() {
           items: data.items || current.items,
           meta: {
             ...current.meta,
-            strategy: data?.meta?.strategy || `Agent refined the whole route around: “${refineInstruction.trim()}”`,
+            strategy: data?.meta?.strategy || `${t.fullAdapted} “${refineInstruction.trim()}”`,
           },
         };
       });
 
-      setAgentMessage(
-        data?.meta?.note || `Full route adapted around: “${refineInstruction.trim()}”.`,
-      );
+      setAgentMessage(data?.meta?.note || `${t.fullAdapted} “${refineInstruction.trim()}”.`);
     } catch (e: any) {
-      setError(e.message || 'Could not refine the route');
+      setError(e.message || t.errorRefine);
     } finally {
       setRefining(false);
     }
@@ -290,27 +287,35 @@ export default function Home() {
           <div className="brand-mark">TP</div>
           <div>
             <strong>TastePassport</strong>
-            <span>AI cultural discovery agent</span>
+            <span>{t.brandSubtitle}</span>
           </div>
         </div>
-        <div className="nav-pill">Powered by Qloo</div>
+        <div className="topbar-actions">
+          <label className="language-picker" aria-label="Language">
+            <span className="language-icon">◎</span>
+            <select value={locale} onChange={(e) => changeLanguage(e.target.value as Locale)}>
+              {languages.map((language) => (
+                <option key={language.code} value={language.code}>{language.label}</option>
+              ))}
+            </select>
+          </label>
+          <div className="nav-pill">{t.poweredBy}</div>
+        </div>
       </nav>
 
       <section className="hero-grid">
         <div className="hero-copy">
-          <div className="eyebrow">Your taste already knows where you should go next.</div>
+          <div className="eyebrow">{t.eyebrow}</div>
           <h1>
-            Explore a city through
-            <span> your own taste.</span>
+            {t.heroTitleA}
+            <span>{t.heroTitleB}</span>
           </h1>
-          <p className="lead">
-            TastePassport translates the music, movies, fashion and food you love into a personalized cultural route — built around you, not generic tourist rankings.
-          </p>
+          <p className="lead">{t.heroLead}</p>
 
           <div className="hero-points">
-            <div><b>01</b><span>Read your taste DNA</span></div>
-            <div><b>02</b><span>Translate it across cities</span></div>
-            <div><b>03</b><span>Adapt the route with an agent</span></div>
+            <div><b>01</b><span>{t.heroPoint1}</span></div>
+            <div><b>02</b><span>{t.heroPoint2}</span></div>
+            <div><b>03</b><span>{t.heroPoint3}</span></div>
           </div>
         </div>
 
@@ -318,36 +323,36 @@ export default function Home() {
           <div className="orbit-ring ring-one" />
           <div className="orbit-ring ring-two" />
           <div className="orbit-core">
-            <span>TASTE</span>
+            <span>{t.orbitTaste}</span>
             <strong>DNA</strong>
           </div>
-          <div className="orbit-chip chip-a">MUSIC</div>
-          <div className="orbit-chip chip-b">FILM</div>
-          <div className="orbit-chip chip-c">FOOD</div>
-          <div className="orbit-chip chip-d">STYLE</div>
-          <div className="orbit-chip chip-e">PLACES</div>
+          <div className="orbit-chip chip-a">{t.orbitMusic}</div>
+          <div className="orbit-chip chip-b">{t.orbitFilm}</div>
+          <div className="orbit-chip chip-c">{t.orbitFood}</div>
+          <div className="orbit-chip chip-d">{t.orbitStyle}</div>
+          <div className="orbit-chip chip-e">{t.orbitPlaces}</div>
         </div>
       </section>
 
       <section className="builder-wrap">
         <div className="builder-head">
           <div>
-            <span className="section-kicker">Build your passport</span>
-            <h2>Tell us what feels like you.</h2>
+            <span className="section-kicker">{t.buildKicker}</span>
+            <h2>{t.buildTitle}</h2>
           </div>
           <button className="ghost-button" onClick={surpriseMe} type="button">
-            ✦ Surprise me
+            ✦ {t.surpriseMe}
           </button>
         </div>
 
         <div className="builder-grid">
           <div className="panel input-panel">
-            <label htmlFor="likes">What do you like?</label>
+            <label htmlFor="likes">{t.whatLike}</label>
             <textarea
               id="likes"
               value={likes}
               onChange={(e) => setLikes(e.target.value)}
-              placeholder="Artists, movies, brands, foods, places..."
+              placeholder={t.likesPlaceholder}
             />
 
             <div className="taste-tags">
@@ -356,7 +361,7 @@ export default function Home() {
 
             <div className="city-pair">
               <div>
-                <label htmlFor="origin">Your taste comes from</label>
+                <label htmlFor="origin">{t.originLabel}</label>
                 <div className="city-input-wrap">
                   <span>◎</span>
                   <input
@@ -369,7 +374,7 @@ export default function Home() {
               </div>
               <div className="translate-arrow">→</div>
               <div>
-                <label htmlFor="city">Translate it into</label>
+                <label htmlFor="city">{t.destinationLabel}</label>
                 <div className="city-input-wrap">
                   <span>⌖</span>
                   <input
@@ -384,7 +389,7 @@ export default function Home() {
           </div>
 
           <div className="panel mode-panel">
-            <label>Discovery mode</label>
+            <label>{t.discoveryMode}</label>
             <div className="mode-stack">
               {(Object.keys(modeCopy) as Mode[]).map((value) => (
                 <button
@@ -404,23 +409,23 @@ export default function Home() {
 
             <button className="primary" onClick={generate} disabled={loading || !likes.trim() || !city.trim()}>
               {loading ? (
-                <><span className="spinner" /> {loadingSteps[loadingStage]?.label || 'Mapping your taste…'}</>
+                <><span className="spinner" /> {t.loadingSteps[loadingStage]?.label || t.loadingHeadline}</>
               ) : (
-                <>Translate my taste <span>→</span></>
+                <>{t.translate} <span>→</span></>
               )}
             </button>
 
             {loading && (
               <div className="loading-cinematic" aria-live="polite">
                 <div className="loading-cinematic-head">
-                  <span>Agent is translating your culture</span>
+                  <span>{t.loadingHeadline}</span>
                   <b>{Math.max(1, loadingProgress)}%</b>
                 </div>
                 <div className="loading-track"><i style={{ width: `${loadingProgress}%` }} /></div>
                 <div className="loading-steps">
-                  {loadingSteps.map((step, index) => (
+                  {t.loadingSteps.map((step, index) => (
                     <div
-                      key={step.short}
+                      key={`${locale}-${step.short}`}
                       className={`${index < loadingStage ? 'done' : ''} ${index === loadingStage ? 'active' : ''}`}
                     >
                       <span>{index < loadingStage ? '✓' : String(index + 1).padStart(2, '0')}</span>
@@ -440,26 +445,26 @@ export default function Home() {
         <section className="results" id="results">
           <div className="results-head">
             <div>
-              <span className="section-kicker">Your cultural route</span>
-              <h2>{result.summary || 'Your personalized route'}</h2>
+              <span className="section-kicker">{t.routeKicker}</span>
+              <h2>{result.summary || t.personalizedRoute}</h2>
             </div>
             <div className="result-meta">
               <span>{result.meta?.source || 'Qloo Insights API'}</span>
-              <b>{result.meta?.matched ?? result.items?.length ?? 0} matches</b>
+              <b>{result.meta?.matched ?? result.items?.length ?? 0} {t.matches}</b>
             </div>
           </div>
 
           <div className="translation-map">
             <div className="translation-city">
-              <span>FROM</span>
-              <strong>{result.meta?.origin || origin || 'Your world'}</strong>
+              <span>{t.from}</span>
+              <strong>{result.meta?.origin || origin || 'Home'}</strong>
             </div>
             <div className="translation-signals">
               {tasteTags.slice(0, 4).map((tag) => <span key={tag}>{tag}</span>)}
               <i>→</i>
             </div>
             <div className="translation-city destination">
-              <span>INTO</span>
+              <span>{t.into}</span>
               <strong>{result.meta?.destination || city}</strong>
             </div>
           </div>
@@ -467,17 +472,17 @@ export default function Home() {
           <div className="agent-note">
             <span className="agent-dot" />
             <div>
-              <b>Agent route strategy</b>
-              <p>{agentMessage || result.meta?.strategy || 'Cross-domain taste signals sequenced into a morning-to-night cultural route.'}</p>
+              <b>{t.agentStrategy}</b>
+              <p>{agentMessage || result.meta?.strategy || t.defaultStrategy}</p>
             </div>
             <div className="agent-mode">{modeCopy[mode].label}</div>
           </div>
 
           <div className={`route-refiner ${refining ? 'is-refining' : ''}`}>
             <div className="refiner-copy">
-              <span>Talk to your route</span>
-              <strong>Refine the whole day in plain English.</strong>
-              <p>Ask for a different vibe without rebuilding your Taste DNA or losing the route structure.</p>
+              <span>{t.talkRoute}</span>
+              <strong>{t.refineTitle}</strong>
+              <p>{t.refineDesc}</p>
             </div>
             <div className="refiner-controls">
               <div className="refiner-input-wrap">
@@ -488,18 +493,18 @@ export default function Home() {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !refining) refineRoute();
                   }}
-                  placeholder="Make it less touristy, more fashion-focused, cheaper..."
-                  aria-label="Route refinement instruction"
+                  placeholder={t.refinePlaceholder}
+                  aria-label={t.talkRoute}
                 />
                 <button type="button" onClick={refineRoute} disabled={refining || !refineInstruction.trim()}>
-                  {refining ? 'Refining…' : 'Refine route'}
+                  {refining ? t.refining : t.refine}
                 </button>
               </div>
               <div className="refiner-presets">
-                {refinePresets.map((preset) => (
+                {t.presets.map((preset) => (
                   <button
                     type="button"
-                    key={preset}
+                    key={`${locale}-${preset}`}
                     className={refineInstruction === preset ? 'active' : ''}
                     onClick={() => setRefineInstruction(preset)}
                   >
@@ -511,27 +516,27 @@ export default function Home() {
           </div>
 
           <div className="taste-dna-card">
-            <div className="dna-label">Your current Taste DNA</div>
+            <div className="dna-label">{t.currentDna}</div>
             <div className="dna-tags">
               {tasteTags.map((tag) => <span key={tag}>{tag}</span>)}
             </div>
-            <div className="dna-mode">Discovery: <b>{modeCopy[mode].label}</b></div>
+            <div className="dna-mode">{t.discovery}: <b>{modeCopy[mode].label}</b></div>
           </div>
 
           {tasteMapLinks.length > 0 && (
             <div className="taste-map-card">
               <div className="taste-map-head">
                 <div>
-                  <span className="section-kicker">Taste translation map</span>
-                  <h3>See how your taste became this city.</h3>
-                  <p>Each line connects one of your cultural signals to a recommendation in the route.</p>
+                  <span className="section-kicker">{t.tasteMapKicker}</span>
+                  <h3>{t.tasteMapTitle}</h3>
+                  <p>{t.tasteMapDesc}</p>
                 </div>
-                <div className="taste-map-count">{tasteMapLinks.length} live connections</div>
+                <div className="taste-map-count">{tasteMapLinks.length} {t.liveConnections}</div>
               </div>
 
               <div className="taste-map-legend">
-                <span>Your signal</span>
-                <span>Translation strength</span>
+                <span>{t.yourSignal}</span>
+                <span>{t.translationStrength}</span>
                 <span>{result.meta?.destination || city}</span>
               </div>
 
@@ -539,7 +544,7 @@ export default function Home() {
                 {tasteMapLinks.map((link, index) => (
                   <div className="taste-map-row" key={`${link.signal}-${link.target}-${index}`}>
                     <div className="taste-map-node taste-map-source">
-                      <small>SIGNAL {String(index + 1).padStart(2, '0')}</small>
+                      <small>{t.signal} {String(index + 1).padStart(2, '0')}</small>
                       <strong>{link.signal}</strong>
                     </div>
                     <div className="taste-map-connection">
@@ -569,30 +574,30 @@ export default function Home() {
                   </div>
                   <div className="route-body">
                     <div className="route-time-row">
-                      <div className="type">{item.type || 'Discovery'}</div>
+                      <div className="type">{item.type || t.discoveryFallback}</div>
                       {(item.time || item.phase) && (
                         <div className="time-pill">{item.time || ''}{item.phase ? ` · ${item.phase}` : ''}</div>
                       )}
                     </div>
                     <h3>{item.name}</h3>
                     {item.address && <div className="address">⌖ {item.address}</div>}
-                    <p>{item.reason || 'A Qloo-powered match connected to your taste profile.'}</p>
-                    {item.bridge && <div className="bridge"><span>taste bridge</span>{item.bridge}</div>}
+                    <p>{item.reason || t.matchFallback}</p>
+                    {item.bridge && <div className="bridge"><span>{t.tasteBridge}</span>{item.bridge}</div>}
                     <div className="match-row">
-                      <span>Route fit</span>
+                      <span>{t.routeFit}</span>
                       <div className="match-bar"><i style={{ width: `${item.fit ?? Math.max(62, 92 - i * 5)}%` }} /></div>
                       <b>{item.fit ?? Math.max(62, 92 - i * 5)}%</b>
                     </div>
 
                     <div className="agent-actions">
-                      <span>Adapt this stop</span>
+                      <span>{t.adaptStop}</span>
                       <div>
                         <button
                           type="button"
                           disabled={isReplacing || refining}
                           onClick={() => replaceStop(i, 'closer')}
                         >
-                          {isReplacing && replacing?.style === 'closer' ? 'Adapting…' : 'More like me'}
+                          {isReplacing && replacing?.style === 'closer' ? t.adapting : t.moreLikeMe}
                         </button>
                         <button
                           type="button"
@@ -600,7 +605,7 @@ export default function Home() {
                           disabled={isReplacing || refining}
                           onClick={() => replaceStop(i, 'surprise')}
                         >
-                          {isReplacing && replacing?.style === 'surprise' ? 'Exploring…' : 'Surprise me more'}
+                          {isReplacing && replacing?.style === 'surprise' ? t.exploring : t.surpriseMore}
                         </button>
                       </div>
                     </div>
@@ -613,29 +618,29 @@ export default function Home() {
       )}
 
       <section className="how-it-works">
-        <div className="section-kicker">What makes it different</div>
+        <div className="section-kicker">{t.differentKicker}</div>
         <div className="feature-grid">
           <div className="feature-card">
             <span>01</span>
-            <h3>Cross-domain taste</h3>
-            <p>Your music can influence restaurants. Your movies can influence neighborhoods. TastePassport connects categories instead of treating them separately.</p>
+            <h3>{t.feature1Title}</h3>
+            <p>{t.feature1Desc}</p>
           </div>
           <div className="feature-card">
             <span>02</span>
-            <h3>Taste translation</h3>
-            <p>It does not just recommend what is popular in a city. It asks what the local equivalent of your existing cultural identity could be.</p>
+            <h3>{t.feature2Title}</h3>
+            <p>{t.feature2Desc}</p>
           </div>
           <div className="feature-card">
             <span>03</span>
-            <h3>Agentic adaptation</h3>
-            <p>Refine one stop or reshape the whole day in natural language without losing the route structure or your original Taste DNA.</p>
+            <h3>{t.feature3Title}</h3>
+            <p>{t.feature3Desc}</p>
           </div>
         </div>
       </section>
 
       <footer>
         <span>TastePassport AI · Qloo Agentic Hackathon 2026</span>
-        <span>Built for cultural discovery, not tourist checklists.</span>
+        <span>{t.footer2}</span>
       </footer>
     </main>
   );
