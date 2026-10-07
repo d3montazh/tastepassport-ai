@@ -1,7 +1,14 @@
+.topbar{
+  position:relative;
+  z-index:1000;
+}
+
 .topbar-actions{
   display:flex;
   align-items:center;
   gap:10px;
+  position:relative;
+  z-index:1001;
 }
 
 .language-picker-native{
@@ -19,7 +26,7 @@
 
 .language-custom{
   position:relative;
-  z-index:80;
+  z-index:1100;
 }
 
 .language-trigger{
@@ -83,6 +90,7 @@
   position:absolute;
   top:calc(100% + 9px);
   right:0;
+  z-index:1200;
   width:210px;
   padding:7px;
   border:1px solid #2a354b;
@@ -107,7 +115,14 @@
   pointer-events:auto;
 }
 
+.language-custom.open .language-menu,
+.language-custom.open .language-menu *{
+  pointer-events:auto;
+}
+
 .language-menu-option{
+  position:relative;
+  z-index:1;
   width:100%;
   min-height:42px;
   display:grid;
@@ -151,6 +166,7 @@
   font-size:8px;
   font-weight:900;
   letter-spacing:.08em;
+  pointer-events:none;
 }
 
 .language-menu-option.active .language-menu-code{
@@ -164,6 +180,7 @@
   font-size:10px;
   font-weight:750;
   letter-spacing:.01em;
+  pointer-events:none;
 }
 
 .language-menu-check{
@@ -171,6 +188,13 @@
   color:#b9c8f4;
   font-size:12px;
   font-weight:900;
+  pointer-events:none;
+}
+
+/* The hero sphere is decorative. It must never steal pointer events from the header dropdown. */
+.taste-orbit,
+.taste-orbit *{
+  pointer-events:none;
 }
 
 @media(max-width:760px){
@@ -185,7 +209,7 @@
 
 @media(max-width:430px){
   .brand>div:last-child span{display:none}
-  .language-menu{position:fixed;top:72px;right:14px;left:auto;width:min(220px,calc(100vw - 28px))}
+  .language-menu{position:fixed;top:72px;right:14px;left:auto;width:min(220px,calc(100vw - 28px));z-index:5000}
 }
 
 @media(prefers-reduced-motion:reduce){
