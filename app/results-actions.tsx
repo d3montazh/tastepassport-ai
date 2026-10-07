@@ -20,9 +20,14 @@ export default function ResultsActions() {
       const kicker = wrap.querySelector<HTMLElement>('.results-restart-copy span');
       const title = wrap.querySelector<HTMLElement>('.results-restart-copy strong');
       const button = wrap.querySelector<HTMLButtonElement>('.results-restart-button');
-      if (kicker) kicker.textContent = copy.kicker;
-      if (title) title.textContent = copy.title;
-      if (button) button.innerHTML = `${copy.button} <span>↑</span>`;
+
+      if (kicker && kicker.textContent !== copy.kicker) kicker.textContent = copy.kicker;
+      if (title && title.textContent !== copy.title) title.textContent = copy.title;
+
+      if (button) {
+        const label = button.querySelector<HTMLElement>('.results-restart-label');
+        if (label && label.textContent !== copy.button) label.textContent = copy.button;
+      }
     };
 
     const installAction = () => {
@@ -31,10 +36,7 @@ export default function ResultsActions() {
       if (!results || !routeLine) return;
 
       const existing = results.querySelector<HTMLElement>('.results-restart');
-      if (existing) {
-        updateCopy(existing);
-        return;
-      }
+      if (existing) return;
 
       const wrap = document.createElement('div');
       wrap.className = 'results-restart';
@@ -46,14 +48,21 @@ export default function ResultsActions() {
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'results-restart-button';
+
+      const buttonLabel = document.createElement('span');
+      buttonLabel.className = 'results-restart-label';
+      const arrow = document.createElement('span');
+      arrow.textContent = '↑';
+      button.append(buttonLabel, arrow);
+
       button.addEventListener('click', () => {
         document.querySelector<HTMLElement>('.builder-wrap')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         window.setTimeout(() => document.querySelector<HTMLTextAreaElement>('#likes')?.focus({ preventScroll: true }), 650);
       });
 
       wrap.append(copy, button);
-      updateCopy(wrap);
       routeLine.insertAdjacentElement('afterend', wrap);
+      updateCopy(wrap);
     };
 
     installAction();
