@@ -35,13 +35,15 @@ The agent turns that into a sequenced cultural route and explains the **taste br
 - Morning-to-night route sequencing
 - Per-stop **Taste Bridge** explanations
 - Per-stop **Route Fit** score
+- **Taste Translation Map** connecting user taste signals to the generated route
+- Cinematic multi-stage generation feedback while the agent builds the route
 - Agent strategy panel showing how the route is being adapted
 - Interactive **More like me** replacement for a single stop
 - Interactive **Surprise me more** replacement for a single stop
 - Single-stop adaptation without rebuilding the rest of the route
 - **Natural-language full-route refinement** such as “Make it less touristy”, “More fashion-focused”, “Make it cheaper”, or “More nightlife”
 - Full-route refinement preserves the time structure while rebalancing the day around the user’s instruction
-- Responsive dark UI for desktop and mobile
+- Responsive dark UI with scroll motion and cursor-reactive Taste DNA visualization
 - Public Vercel deployment
 - Transparent fallback Demo Mode while API access is unavailable
 
@@ -57,6 +59,10 @@ After the initial route is generated, the user can adapt individual stops:
 The user can also talk to the full route in plain English. Prompts such as **“Make it less touristy”**, **“More fashion-focused”**, **“Make it cheaper”**, or **“More nightlife”** rebalance the whole day while preserving the route’s morning-to-night structure and the original Taste DNA.
 
 This creates two levels of control: targeted single-stop changes and higher-level whole-route direction.
+
+## Explainability
+
+TastePassport is designed to show more than a recommendation list. The **Taste Translation Map** visualizes how individual taste signals connect to route stops, while Taste Bridges and Route Fit scores explain the relationship at the stop level.
 
 ## Qloo integration
 
@@ -90,6 +96,9 @@ app/
   page.tsx       # interactive client experience
   globals.css
   enhancements.css
+  animations.css
+  cursor-blob.css
+  taste-map.css
 ```
 
 ## Run locally
