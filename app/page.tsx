@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 
 type Mode = 'safe' | 'balanced' | 'unexpected';
+type ReplacementStyle = 'closer' | 'surprise';
 
 type ResultItem = {
   name: string;
@@ -74,6 +75,8 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ResultPayload | null>(null);
   const [error, setError] = useState('');
+  const [replacing, setReplacing] = useState<{ index: number; style: ReplacementStyle } | null>(null);
+  const [agentMessage, setAgentMessage] = useState('');
 
   const tasteTags = useMemo(
     () =>
@@ -95,12 +98,14 @@ export default function Home() {
     setMode('unexpected');
     setResult(null);
     setError('');
+    setAgentMessage('');
   }
 
   async function generate() {
     setLoading(true);
     setError('');
     setResult(null);
+    setAgentMessage('');
 
     try {
       const res = await fetch('/api/recommend', {
@@ -118,6 +123,60 @@ export default function Home() {
       setError(e.message || 'Something went wrong');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function replaceStop(index: number, replacementStyle: ReplacementStyle) {
+    if (!result?.items?.[index]) return;
+
+    setReplacing({ index, style: replacementStyle });
+    setError('');
+    setAgentMessage('');
+
+    try {
+      const res = await fetch('/api/replace', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          likes,
+          origin,
+          city,
+          mode,
+          index,
+          replacementStyle,
+          currentItem: result.items[index],
+          currentNames: result.items.map((item) => item.name),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not replace this stop');
+
+      setResult((current) => {
+        if (!current?.items) return current;
+        const nextItems = [...current.items];
+        nextItems[index] = data.item;
+        return {
+          ...current,
+          items: nextItems,
+          meta: {
+            ...current.meta,
+            strategy: replacementStyle === 'surprise'
+              ? 'Agent adapted one stop with a wider discovery radius while preserving the rest of the day.'
+              : 'Agent adapted one stop toward your strongest taste signals while preserving the rest of the day.',
+          },
+        };
+      });
+
+      setAgentMessage(
+        data?.meta?.note ||
+          (replacementStyle === 'surprise'
+            ? `Stop ${String(index + 1).padStart(2, '0')} was made more unexpected.`
+            : `Stop ${String(index + 1).padStart(2, '0')} was pulled closer to your Taste DNA.`),
+      );
+    } catch (e: any) {
+      setError(e.message || 'Could not replace this stop');
+    } finally {
+      setReplacing(null);
     }
   }
 
@@ -151,7 +210,7 @@ export default function Home() {
           <div className="hero-points">
             <div><b>01</b><span>Read your taste DNA</span></div>
             <div><b>02</b><span>Translate it across cities</span></div>
-            <div><b>03</b><span>Sequence a day around you</span></div>
+            <div><b>03</b><span>Adapt the route with an agent</span></div>
           </div>
         </div>
 
@@ -288,7 +347,7 @@ export default function Home() {
             <span className="agent-dot" />
             <div>
               <b>Agent route strategy</b>
-              <p>{result.meta?.strategy || 'Cross-domain taste signals sequenced into a morning-to-night cultural route.'}</p>
+              <p>{agentMessage || result.meta?.strategy || 'Cross-domain taste signals sequenced into a morning-to-night cultural route.'}</p>
             </div>
             <div className="agent-mode">{modeCopy[mode].label}</div>
           </div>
@@ -302,31 +361,55 @@ export default function Home() {
           </div>
 
           <div className="route-line">
-            {(result.items || []).map((item, i) => (
-              <article className="route-card" key={`${item.name}-${i}`}>
-                <div className="route-step">
-                  <span>{String(i + 1).padStart(2, '0')}</span>
-                  <i />
-                </div>
-                <div className="route-body">
-                  <div className="route-time-row">
-                    <div className="type">{item.type || 'Discovery'}</div>
-                    {(item.time || item.phase) && (
-                      <div className="time-pill">{item.time || ''}{item.phase ? ` · ${item.phase}` : ''}</div>
-                    )}
+            {(result.items || []).map((item, i) => {
+              const isReplacing = replacing?.index === i;
+              return (
+                <article className={`route-card ${isReplacing ? 'is-replacing' : ''}`} key={`${item.name}-${i}`}>
+                  <div className="route-step">
+                    <span>{String(i + 1).padStart(2, '0')}</span>
+                    <i />
                   </div>
-                  <h3>{item.name}</h3>
-                  {item.address && <div className="address">⌖ {item.address}</div>}
-                  <p>{item.reason || 'A Qloo-powered match connected to your taste profile.'}</p>
-                  {item.bridge && <div className="bridge"><span>taste bridge</span>{item.bridge}</div>}
-                  <div className="match-row">
-                    <span>Route fit</span>
-                    <div className="match-bar"><i style={{ width: `${item.fit ?? Math.max(62, 92 - i * 5)}%` }} /></div>
-                    <b>{item.fit ?? Math.max(62, 92 - i * 5)}%</b>
+                  <div className="route-body">
+                    <div className="route-time-row">
+                      <div className="type">{item.type || 'Discovery'}</div>
+                      {(item.time || item.phase) && (
+                        <div className="time-pill">{item.time || ''}{item.phase ? ` · ${item.phase}` : ''}</div>
+                      )}
+                    </div>
+                    <h3>{item.name}</h3>
+                    {item.address && <div className="address">⌖ {item.address}</div>}
+                    <p>{item.reason || 'A Qloo-powered match connected to your taste profile.'}</p>
+                    {item.bridge && <div className="bridge"><span>taste bridge</span>{item.bridge}</div>}
+                    <div className="match-row">
+                      <span>Route fit</span>
+                      <div className="match-bar"><i style={{ width: `${item.fit ?? Math.max(62, 92 - i * 5)}%` }} /></div>
+                      <b>{item.fit ?? Math.max(62, 92 - i * 5)}%</b>
+                    </div>
+
+                    <div className="agent-actions">
+                      <span>Adapt this stop</span>
+                      <div>
+                        <button
+                          type="button"
+                          disabled={isReplacing}
+                          onClick={() => replaceStop(i, 'closer')}
+                        >
+                          {isReplacing && replacing?.style === 'closer' ? 'Adapting…' : 'More like me'}
+                        </button>
+                        <button
+                          type="button"
+                          className="surprise-action"
+                          disabled={isReplacing}
+                          onClick={() => replaceStop(i, 'surprise')}
+                        >
+                          {isReplacing && replacing?.style === 'surprise' ? 'Exploring…' : 'Surprise me more'}
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </article>
-            ))}
+                </article>
+              );
+            })}
           </div>
         </section>
       )}
@@ -346,8 +429,8 @@ export default function Home() {
           </div>
           <div className="feature-card">
             <span>03</span>
-            <h3>Agentic sequencing</h3>
-            <p>Matches are organized into a usable morning-to-night route instead of dropped into an unstructured recommendation list.</p>
+            <h3>Agentic adaptation</h3>
+            <p>Users can refine one stop without rebuilding the entire day — asking the agent to move closer to their taste or deliberately push further out.</p>
           </div>
         </div>
       </section>
