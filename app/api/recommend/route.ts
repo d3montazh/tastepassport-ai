@@ -9,6 +9,9 @@ type QlooEntity = {
   query?: Record<string, any>;
 };
 
+const routeTimes = ['10:00', '11:45', '13:30', '16:00', '18:30', '21:30'];
+const routePhases = ['Morning', 'Late morning', 'Lunch', 'Afternoon', 'Golden hour', 'Night'];
+
 function pickEntities(payload: any): QlooEntity[] {
   const candidates = [
     payload?.results?.entities,
@@ -36,41 +39,51 @@ function reasonFor(entity: QlooEntity, mode: string) {
   return 'A balanced Qloo match combining familiarity with a little discovery.';
 }
 
-function demoItems(city: string, interests: string[], mode: string) {
+function demoItems(city: string, origin: string, interests: string[], mode: string) {
   const seed = interests[0] || 'your taste';
   const second = interests[1] || 'your favorite culture';
   const third = interests[2] || 'your style';
 
-  return [
+  const base = [
     {
       name: `${city} listening room`,
       type: 'Music · Culture',
       reason: `Demo preview: a music-first stop inspired by ${seed}, chosen to start the route with a strong personal signal.`,
       address: `Central ${city}`,
+      bridge: `${seed} → local music culture`,
+      fit: 94,
     },
     {
       name: 'Independent design district',
       type: 'Fashion · Neighborhood',
       reason: `Demo preview: a neighborhood direction that translates the visual language of ${second} into local fashion and design.`,
       address: `${city} design quarter`,
+      bridge: `${second} → local design language`,
+      fit: 89,
     },
     {
       name: 'Late lunch, local twist',
       type: 'Food',
       reason: `Demo preview: food discovery influenced by ${third}, with the ${mode} discovery setting controlling how adventurous the match feels.`,
       address: `${city} food district`,
+      bridge: `${third} → food discovery`,
+      fit: 86,
     },
     {
       name: 'Hidden cinema & gallery stop',
       type: 'Film · Art',
       reason: `Demo preview: a cross-domain stop connecting your entertainment taste with smaller cultural venues in ${city}.`,
       address: `Creative ${city}`,
+      bridge: 'screen taste → physical culture',
+      fit: 82,
     },
     {
       name: 'Golden-hour city texture',
       type: 'Place · Photography',
-      reason: 'Demo preview: a visually distinctive place selected to match the mood and aesthetic patterns in your taste profile.',
+      reason: `Demo preview: a visually distinctive place selected to match the mood and aesthetic patterns you bring from ${origin || 'home'}.`,
       address: `${city} viewpoint`,
+      bridge: `${origin || 'home'} aesthetic → ${city} texture`,
+      fit: 79,
     },
     {
       name: 'After-dark wildcard',
@@ -79,8 +92,16 @@ function demoItems(city: string, interests: string[], mode: string) {
         ? 'Demo preview: the wildcard stop intentionally reaches beyond your obvious preferences while staying culturally adjacent.'
         : 'Demo preview: a comfortable final stop that keeps the route connected to your strongest preferences.',
       address: `${city} after dark`,
+      bridge: 'strongest signal → controlled surprise',
+      fit: mode === 'unexpected' ? 74 : 84,
     },
   ];
+
+  return base.map((item, index) => ({
+    ...item,
+    time: routeTimes[index],
+    phase: routePhases[index],
+  }));
 }
 
 export async function POST(request: Request) {
@@ -88,10 +109,11 @@ export async function POST(request: Request) {
     const body = await request.json();
     const likes = String(body?.likes || '').trim();
     const city = String(body?.city || '').trim();
+    const origin = String(body?.origin || '').trim();
     const mode = String(body?.mode || 'balanced');
 
     if (!likes || !city) {
-      return NextResponse.json({ error: 'Likes and city are required.' }, { status: 400 });
+      return NextResponse.json({ error: 'Likes and destination city are required.' }, { status: 400 });
     }
 
     const apiKey = process.env.QLOO_API_KEY;
@@ -102,11 +124,8 @@ export async function POST(request: Request) {
       .filter(Boolean)
       .slice(0, 8);
 
-    // Temporary transparent fallback so the product can be previewed while
-    // Qloo access is under maintenance. It is intentionally labelled Demo mode
-    // and is replaced automatically as soon as QLOO_API_KEY is configured.
     if (!apiKey) {
-      const items = demoItems(city, interests, mode);
+      const items = demoItems(city, origin, interests, mode);
       return NextResponse.json({
         summary: `${city}, translated through ${interests.slice(0, 3).join(', ')}${interests.length > 3 ? '…' : ''}`,
         items,
@@ -114,6 +133,9 @@ export async function POST(request: Request) {
           source: 'Demo mode · add QLOO_API_KEY for live Qloo data',
           mode,
           matched: items.length,
+          origin,
+          destination: city,
+          strategy: 'Cross-domain signals sequenced into a morning-to-night cultural route',
         },
       });
     }
@@ -166,6 +188,10 @@ export async function POST(request: Request) {
         type: entity?.subtype || entity?.type || props?.subtype || 'Place',
         reason: reasonFor(entity, mode),
         address: props?.address || props?.formatted_address || null,
+        time: routeTimes[index],
+        phase: routePhases[index],
+        bridge: `${interests[index % Math.max(interests.length, 1)] || 'your taste'} → ${city} discovery`,
+        fit: Math.max(68, 94 - index * 5),
       };
     });
 
@@ -176,6 +202,9 @@ export async function POST(request: Request) {
         source: 'Qloo Insights API',
         mode,
         matched: items.length,
+        origin,
+        destination: city,
+        strategy: 'Qloo taste signals sequenced into a morning-to-night cultural route',
       },
     });
   } catch (error) {
