@@ -59,6 +59,13 @@ const refinePresets = [
   'More nightlife',
 ];
 
+const loadingSteps = [
+  { label: 'Reading your Taste DNA', short: 'Taste DNA' },
+  { label: 'Mapping cross-domain signals', short: 'Signals' },
+  { label: 'Translating culture between cities', short: 'Translate' },
+  { label: 'Building your cultural route', short: 'Route' },
+];
+
 const modeCopy: Record<Mode, { label: string; note: string }> = {
   safe: {
     label: 'Safe',
@@ -80,6 +87,8 @@ export default function Home() {
   const [city, setCity] = useState('New York');
   const [mode, setMode] = useState<Mode>('balanced');
   const [loading, setLoading] = useState(false);
+  const [loadingStage, setLoadingStage] = useState(0);
+  const [loadingProgress, setLoadingProgress] = useState(0);
   const [result, setResult] = useState<ResultPayload | null>(null);
   const [error, setError] = useState('');
   const [replacing, setReplacing] = useState<{ index: number; style: ReplacementStyle } | null>(null);
@@ -97,6 +106,22 @@ export default function Home() {
     [likes],
   );
 
+  const tasteMapLinks = useMemo(() => {
+    const items = result?.items || [];
+    if (!items.length) return [];
+    const signals = tasteTags.length ? tasteTags : ['Your Taste DNA'];
+
+    return items.slice(0, 6).map((item, index) => {
+      const bridgeSignal = item.bridge?.split('→')?.[0]?.trim();
+      return {
+        signal: bridgeSignal || signals[index % signals.length],
+        target: item.name,
+        type: item.type || 'Discovery',
+        fit: item.fit ?? Math.max(62, 92 - index * 5),
+      };
+    });
+  }, [result, tasteTags]);
+
   function surpriseMe() {
     const current = `${likes}|${origin}|${city}`;
     const options = surpriseSeeds.filter((seed) => `${seed.likes}|${seed.origin}|${seed.city}` !== current);
@@ -112,9 +137,19 @@ export default function Home() {
 
   async function generate() {
     setLoading(true);
+    setLoadingStage(0);
+    setLoadingProgress(14);
     setError('');
     setResult(null);
     setAgentMessage('');
+
+    const startedAt = Date.now();
+    let stage = 0;
+    const loadingTimer = window.setInterval(() => {
+      stage = Math.min(stage + 1, loadingSteps.length - 1);
+      setLoadingStage(stage);
+      setLoadingProgress([14, 39, 67, 88][stage] || 88);
+    }, 520);
 
     try {
       const res = await fetch('/api/recommend', {
@@ -124,6 +159,15 @@ export default function Home() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Something went wrong');
+
+      const remaining = Math.max(0, 1850 - (Date.now() - startedAt));
+      if (remaining) await new Promise((resolve) => window.setTimeout(resolve, remaining));
+
+      window.clearInterval(loadingTimer);
+      setLoadingStage(loadingSteps.length - 1);
+      setLoadingProgress(100);
+      await new Promise((resolve) => window.setTimeout(resolve, 220));
+
       setResult(data);
       requestAnimationFrame(() => {
         document.getElementById('results')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -131,7 +175,9 @@ export default function Home() {
     } catch (e: any) {
       setError(e.message || 'Something went wrong');
     } finally {
+      window.clearInterval(loadingTimer);
       setLoading(false);
+      setLoadingProgress(0);
     }
   }
 
@@ -358,11 +404,32 @@ export default function Home() {
 
             <button className="primary" onClick={generate} disabled={loading || !likes.trim() || !city.trim()}>
               {loading ? (
-                <><span className="spinner" /> Mapping your taste…</>
+                <><span className="spinner" /> {loadingSteps[loadingStage]?.label || 'Mapping your taste…'}</>
               ) : (
                 <>Translate my taste <span>→</span></>
               )}
             </button>
+
+            {loading && (
+              <div className="loading-cinematic" aria-live="polite">
+                <div className="loading-cinematic-head">
+                  <span>Agent is translating your culture</span>
+                  <b>{Math.max(1, loadingProgress)}%</b>
+                </div>
+                <div className="loading-track"><i style={{ width: `${loadingProgress}%` }} /></div>
+                <div className="loading-steps">
+                  {loadingSteps.map((step, index) => (
+                    <div
+                      key={step.short}
+                      className={`${index < loadingStage ? 'done' : ''} ${index === loadingStage ? 'active' : ''}`}
+                    >
+                      <span>{index < loadingStage ? '✓' : String(index + 1).padStart(2, '0')}</span>
+                      <small>{step.short}</small>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {error && <div className="error">{error}</div>}
           </div>
@@ -450,6 +517,46 @@ export default function Home() {
             </div>
             <div className="dna-mode">Discovery: <b>{modeCopy[mode].label}</b></div>
           </div>
+
+          {tasteMapLinks.length > 0 && (
+            <div className="taste-map-card">
+              <div className="taste-map-head">
+                <div>
+                  <span className="section-kicker">Taste translation map</span>
+                  <h3>See how your taste became this city.</h3>
+                  <p>Each line connects one of your cultural signals to a recommendation in the route.</p>
+                </div>
+                <div className="taste-map-count">{tasteMapLinks.length} live connections</div>
+              </div>
+
+              <div className="taste-map-legend">
+                <span>Your signal</span>
+                <span>Translation strength</span>
+                <span>{result.meta?.destination || city}</span>
+              </div>
+
+              <div className="taste-map-graph">
+                {tasteMapLinks.map((link, index) => (
+                  <div className="taste-map-row" key={`${link.signal}-${link.target}-${index}`}>
+                    <div className="taste-map-node taste-map-source">
+                      <small>SIGNAL {String(index + 1).padStart(2, '0')}</small>
+                      <strong>{link.signal}</strong>
+                    </div>
+                    <div className="taste-map-connection">
+                      <div className="taste-map-line">
+                        <i style={{ left: `${Math.min(91, Math.max(9, link.fit))}%` }} />
+                      </div>
+                      <b>{link.fit}%</b>
+                    </div>
+                    <div className="taste-map-node taste-map-target">
+                      <small>{link.type}</small>
+                      <strong>{link.target}</strong>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="route-line">
             {(result.items || []).map((item, i) => {
