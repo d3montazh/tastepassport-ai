@@ -37,13 +37,13 @@ function pickEntities(payload: any): QlooEntity[] {
 function intentFromInstruction(instruction: string) {
   const text = instruction.toLowerCase();
   return {
-    lessTouristy: /less tourist|non[- ]?tourist|local|hidden|underground/.test(text),
-    fashion: /fashion|style|design|clothes|shopping/.test(text),
-    budget: /cheap|cheaper|budget|affordable|low cost/.test(text),
-    nightlife: /night|nightlife|club|bar|late/.test(text),
-    food: /food|restaurant|eat|lunch|dinner|cafe/.test(text),
-    music: /music|concert|vinyl|listening/.test(text),
-    art: /art|gallery|museum|cinema|film/.test(text),
+    lessTouristy: /less tourist|non[- ]?tourist|local|hidden|underground|менее турист|менше турист|локальн|скрыт|прихован|андеграунд|menos tur|local|oculto|地下|本地|游客/.test(text),
+    fashion: /fashion|style|design|clothes|shopping|мод|стил|дизайн|одежд|одяг|шоп|moda|estilo|diseño|ropa|compras|时尚|风格|设计|购物/.test(text),
+    budget: /cheap|cheaper|budget|affordable|low cost|дешев|бюджет|доступн|经济|便宜|presupuesto|barato|económico|asequible/.test(text),
+    nightlife: /night|nightlife|club|bar|late|ноч|клуб|бар|вечер|ніч|вечір|vida nocturna|noche|club|bar|夜生活|夜晚|俱乐部|酒吧/.test(text),
+    food: /food|restaurant|eat|lunch|dinner|cafe|еда|ресторан|есть|обед|ужин|кафе|їжа|їсти|обід|вечеря|comida|restaurante|comer|almuerzo|cena|café|美食|餐厅|吃|午餐|晚餐|咖啡/.test(text),
+    music: /music|concert|vinyl|listening|музык|концерт|винил|слуш|музик|слух|música|concierto|vinilo|escuchar|音乐|演唱会|黑胶|听/.test(text),
+    art: /art|gallery|museum|cinema|film|искусств|галере|музе|кино|фильм|мистецтв|галере|музе|кіно|фільм|arte|galería|museo|cine|película|艺术|画廊|博物馆|电影/.test(text),
   };
 }
 
