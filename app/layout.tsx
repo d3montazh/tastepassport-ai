@@ -4,6 +4,7 @@ import './animations.css';
 import './cursor-blob.css';
 import './taste-map.css';
 import './mobile-polish.css';
+import './language.css';
 import ScrollEffects from './scroll-effects';
 import ResultsActions from './results-actions';
 
