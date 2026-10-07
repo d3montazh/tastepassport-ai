@@ -27,7 +27,7 @@ function pickEntities(payload: any): QlooEntity[] {
   return [];
 }
 
-function copyFor(locale: Locale) {
+function copyFor(locale: Locale): any {
   if (locale === 'ru') return {
     phases: ['Утро', 'Позднее утро', 'Обед', 'День', 'Золотой час', 'Ночь'],
     sourceDemo: 'Демо-режим · добавьте QLOO_API_KEY для живых данных Qloo',
@@ -154,7 +154,7 @@ function demoItems(city: string, origin: string, interests: string[], mode: stri
   const signals = [seed, second, third, seed, seed, seed];
   const c = copyFor(locale);
 
-  return c.demo.map((template, index) => ({
+  return c.demo.map((template: any, index: number) => ({
     name: template.name(city),
     type: template.type,
     reason: template.reason(signals[index], mode, city, origin),
