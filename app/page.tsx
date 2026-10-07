@@ -51,6 +51,86 @@ const surpriseSeeds = [
     origin: 'Berlin',
     city: 'Paris',
   },
+  {
+    likes: 'Kendrick Lamar, Akira, Stüssy, Korean BBQ, skate culture',
+    origin: 'Los Angeles',
+    city: 'Seoul',
+  },
+  {
+    likes: 'Rosalía, Pedro Almodóvar, Loewe, tapas, contemporary art',
+    origin: 'Barcelona',
+    city: 'Mexico City',
+  },
+  {
+    likes: 'Fred again.., Her, Our Legacy, natural wine, industrial design',
+    origin: 'Warsaw',
+    city: 'Copenhagen',
+  },
+  {
+    likes: 'Tame Impala, Lost in Translation, Issey Miyake, sushi, jazz bars',
+    origin: 'Amsterdam',
+    city: 'Osaka',
+  },
+  {
+    likes: 'Bad Bunny, Wong Kar-wai, Jacquemus, seafood, colorful architecture',
+    origin: 'Lisbon',
+    city: 'Buenos Aires',
+  },
+  {
+    likes: 'Charli XCX, The Matrix, Rick Owens, techno, brutalist interiors',
+    origin: 'Prague',
+    city: 'Seoul',
+  },
+  {
+    likes: 'Radiohead, The Lighthouse, Acne Studios, specialty coffee, modern architecture',
+    origin: 'Stockholm',
+    city: 'Berlin',
+  },
+  {
+    likes: 'Måneskin, La Dolce Vita, Prada, aperitivo, contemporary photography',
+    origin: 'Rome',
+    city: 'Tokyo',
+  },
+  {
+    likes: 'Daft Punk, Amélie, Maison Margiela, bakeries, art-house cinema',
+    origin: 'Paris',
+    city: 'Seoul',
+  },
+  {
+    likes: 'Tyler the Creator, Moonlight, Supreme, soul food, vinyl shops',
+    origin: 'New York',
+    city: 'London',
+  },
+  {
+    likes: 'Ryuichi Sakamoto, Perfect Days, Comme des Garçons, kissaten coffee, minimal architecture',
+    origin: 'Tokyo',
+    city: 'Paris',
+  },
+  {
+    likes: 'C. Tangana, Dune, Balenciaga, pintxos, rooftop culture',
+    origin: 'Madrid',
+    city: 'New York',
+  },
+  {
+    likes: 'Burial, Ex Machina, Marimekko, Nordic food, saunas',
+    origin: 'Helsinki',
+    city: 'Copenhagen',
+  },
+  {
+    likes: 'FKA twigs, The Handmaiden, Jil Sander, vegan tasting menus, performance art',
+    origin: 'Vienna',
+    city: 'Barcelona',
+  },
+  {
+    likes: 'King Krule, Chungking Express, Palace, dumplings, street photography',
+    origin: 'Melbourne',
+    city: 'Tokyo',
+  },
+  {
+    likes: 'Kali Uchis, Roma, Bode, tacos, modernist architecture',
+    origin: 'Mexico City',
+    city: 'Madrid',
+  },
 ];
 
 export default function Home() {
