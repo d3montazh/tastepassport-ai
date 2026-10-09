@@ -1,3 +1,4 @@
+import { qlooPlaces, fallbackSource, requestError } from '../../lib/qloo';
 import { NextResponse } from 'next/server';
 import { normalizeLocale, type Locale } from '../../i18n';
 
@@ -12,20 +13,6 @@ type QlooEntity = {
 
 const routeTimes = ['10:00', '11:45', '13:30', '16:00', '18:30', '21:30'];
 
-function pickEntities(payload: any): QlooEntity[] {
-  const candidates = [
-    payload?.results?.entities,
-    payload?.results,
-    payload?.entities,
-    payload?.data?.results?.entities,
-    payload?.data?.entities,
-  ];
-
-  for (const value of candidates) {
-    if (Array.isArray(value)) return value;
-  }
-  return [];
-}
 
 function copyFor(locale: Locale): any {
   if (locale === 'ru') return {
@@ -167,6 +154,7 @@ function demoItems(city: string, origin: string, interests: string[], mode: stri
 }
 
 export async function POST(request: Request) {
+  let errorLocale: Locale = 'en';
   try {
     const body = await request.json();
     const likes = String(body?.likes || '').trim();
@@ -174,13 +162,12 @@ export async function POST(request: Request) {
     const origin = String(body?.origin || '').trim();
     const mode = String(body?.mode || 'balanced');
     const locale = normalizeLocale(body?.locale);
+    errorLocale = locale;
 
-    if (!likes || !city) {
-      return NextResponse.json({ error: 'Likes and destination city are required.' }, { status: 400 });
+    if (!likes || !city || !likes.split(/[,\n]/).some((value) => value.trim())) {
+      return NextResponse.json({ error: requestError(locale) }, { status: 400 });
     }
 
-    const apiKey = process.env.QLOO_API_KEY;
-    const baseUrl = (process.env.QLOO_BASE_URL || 'https://api.qloo.com/v2').replace(/\/$/, '');
     const interests = likes
       .split(/[,\n]/)
       .map((x) => x.trim())
@@ -188,13 +175,16 @@ export async function POST(request: Request) {
       .slice(0, 8);
     const c = copyFor(locale);
 
-    if (!apiKey) {
+    const entities = await qlooPlaces({ city, interests, take: 8,
+      popularityMax: mode === 'unexpected' ? 0.82 : undefined });
+    if (!entities.length) {
       const items = demoItems(city, origin, interests, mode, locale);
       return NextResponse.json({
         summary: c.summary(city, interests),
         items,
         meta: {
-          source: c.sourceDemo,
+          source: fallbackSource(locale),
+          fallback: true,
           mode,
           matched: items.length,
           origin,
@@ -204,51 +194,10 @@ export async function POST(request: Request) {
       });
     }
 
-    const popularityMax = mode === 'unexpected' ? 0.82 : undefined;
-    const take = 8;
-
-    const qlooBody: Record<string, any> = {
-      'filter.type': 'urn:entity:place',
-      'filter.location.query': city,
-      'signal.interests.entities.query': interests,
-      'feature.explainability': true,
-      take,
-    };
-
-    if (popularityMax) qlooBody['filter.popularity.max'] = popularityMax;
-
-    const response = await fetch(`${baseUrl}/insights`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        'X-Api-Key': apiKey,
-      },
-      body: JSON.stringify(qlooBody),
-      cache: 'no-store',
-    });
-
-    const rawText = await response.text();
-    let data: any = {};
-    try {
-      data = rawText ? JSON.parse(rawText) : {};
-    } catch {
-      data = { raw: rawText };
-    }
-
-    if (!response.ok) {
-      console.error('Qloo error:', response.status, data);
-      return NextResponse.json(
-        { error: `Qloo request failed (${response.status}). Check your API key/base URL and parameters.` },
-        { status: 502 },
-      );
-    }
-
-    const entities = pickEntities(data);
     const items = entities.slice(0, 6).map((entity, index) => {
       const props = entity?.properties || {};
       return {
-        name: entity?.name || entity?.title || `Discovery ${index + 1}`,
+        name: entity?.name || `Discovery ${index + 1}`,
         type: entity?.subtype || entity?.type || props?.subtype || 'Place',
         reason: reasonFor(entity, mode, locale),
         address: props?.address || props?.formatted_address || null,
@@ -263,7 +212,7 @@ export async function POST(request: Request) {
       summary: c.summary(city, interests),
       items,
       meta: {
-        source: 'Qloo Insights API',
+        source: 'Qloo Insights API', fallback: false,
         mode,
         matched: items.length,
         origin,
@@ -271,8 +220,7 @@ export async function POST(request: Request) {
         strategy: c.liveStrategy,
       },
     });
-  } catch (error) {
-    console.error(error);
-    return NextResponse.json({ error: 'Unexpected server error.' }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: requestError(errorLocale) }, { status: 400 });
   }
 }

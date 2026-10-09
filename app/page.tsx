@@ -297,6 +297,7 @@ export default function Home() {
           items: nextItems,
           meta: {
             ...current.meta,
+            source: data?.meta?.fallback ? data.meta.source : current.meta?.source,
             strategy: replacementStyle === 'surprise' ? t.strategySurprise : t.strategyCloser,
           },
         };
@@ -344,6 +345,7 @@ export default function Home() {
           items: data.items || current.items,
           meta: {
             ...current.meta,
+            source: data?.meta?.source || current.meta?.source,
             strategy: data?.meta?.strategy || `${t.fullAdapted} “${refineInstruction.trim()}”`,
           },
         };
