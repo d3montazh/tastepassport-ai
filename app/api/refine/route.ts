@@ -1,3 +1,4 @@
+import { qlooPlaces, fallbackSource, requestError } from '../../lib/qloo';
 import { NextResponse } from 'next/server';
 import { normalizeLocale, type Locale } from '../../i18n';
 
@@ -20,11 +21,6 @@ type QlooEntity = {
   properties?: Record<string, any>;
 };
 
-function pickEntities(payload: any): QlooEntity[] {
-  const candidates = [payload?.results?.entities, payload?.results, payload?.entities, payload?.data?.results?.entities, payload?.data?.entities];
-  for (const value of candidates) if (Array.isArray(value)) return value;
-  return [];
-}
 
 function intentFromInstruction(instruction: string) {
   const text = instruction.toLowerCase();
@@ -169,14 +165,16 @@ function demoRefine(city: string, interests: string[], instruction: string, curr
       bridge = `${interests[1] || seed} → ${copy.types.art}`;
     }
 
-    return { ...item, name, type, reason, bridge, fit, address: item.address || `${city} · ${copy.refined}` };
+    return { ...item, name, type, reason, bridge, fit, address: `${city} · ${copy.refined}` };
   });
 }
 
 export async function POST(request: Request) {
+  let errorLocale: Locale = 'en';
   try {
     const body = await request.json();
     const locale = normalizeLocale(body?.locale);
+    errorLocale = locale;
     const copy = copyFor(locale);
     const likes = String(body?.likes || '').trim();
     const city = String(body?.city || '').trim();
@@ -188,46 +186,34 @@ export async function POST(request: Request) {
     if (!likes || !city || !instruction || !currentItems.length) return NextResponse.json({ error: copy.required }, { status: 400 });
 
     const interests = likes.split(/[,\n]/).map((x) => x.trim()).filter(Boolean).slice(0, 8);
-    const apiKey = process.env.QLOO_API_KEY;
-    const baseUrl = (process.env.QLOO_BASE_URL || 'https://api.qloo.com/v2').replace(/\/$/, '');
     const intent = intentFromInstruction(instruction);
 
-    if (!apiKey) {
+    const categories = [intent.fashion && 'Fashion', intent.nightlife && 'Nightlife',
+      intent.food && 'Restaurant', intent.music && 'Music', intent.art && 'Art'].filter(Boolean) as string[];
+    const supported = intent.lessTouristy || intent.budget || categories.length > 0;
+    const entities = supported ? await qlooPlaces({ city, interests, take: 20, categories,
+      budget: intent.budget, popularityMax: intent.lessTouristy || mode === 'unexpected' ? 0.65 : undefined }) : [];
+    if (entities.length < currentItems.length) {
       const items = demoRefine(city, interests, instruction, currentItems, locale);
-      return NextResponse.json({ items, meta: { source: 'Demo mode', origin, destination: city, instruction, strategy: copy.strategy(instruction), note: copy.note } });
+      return NextResponse.json({ items, meta: { source: fallbackSource(locale), fallback: true, origin, destination: city, instruction, strategy: copy.strategy(instruction), note: copy.note } });
     }
 
-    const qlooBody: Record<string, any> = {
-      'filter.type': 'urn:entity:place', 'filter.location.query': city, 'signal.interests.entities.query': [...interests, instruction].slice(0, 9), 'feature.explainability': true, take: 20,
-    };
-    if (intent.lessTouristy || mode === 'unexpected') qlooBody['filter.popularity.max'] = 0.65;
-
-    const response = await fetch(`${baseUrl}/insights`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-Api-Key': apiKey }, body: JSON.stringify(qlooBody), cache: 'no-store' });
-    const rawText = await response.text();
-    let data: any = {};
-    try { data = rawText ? JSON.parse(rawText) : {}; } catch { data = { raw: rawText }; }
-    if (!response.ok) return NextResponse.json({ error: `Qloo refinement request failed (${response.status}).` }, { status: 502 });
-
-    const entities = pickEntities(data);
-    if (!entities.length) return NextResponse.json({ error: 'Qloo returned no matches for this refinement.' }, { status: 404 });
-
     const items = currentItems.map((current, index) => {
-      const entity = entities[index % entities.length];
+      const entity = entities[index];
       const props = entity?.properties || {};
       return {
         ...current,
-        name: entity?.name || entity?.title || current.name || `${copy.discovery} ${index + 1}`,
+        name: entity?.name || current.name || `${copy.discovery} ${index + 1}`,
         type: entity?.subtype || entity?.type || props?.subtype || current.type || copy.place,
-        address: props?.address || props?.formatted_address || current.address || null,
+        address: props?.address || props?.formatted_address || null,
         reason: copy.liveReason(instruction),
         bridge: `${interests[index % Math.max(interests.length, 1)] || copy.bridgeTaste} + ${instruction} → ${city}`,
         fit: Math.max(74, 93 - index * 4),
       };
     });
 
-    return NextResponse.json({ items, meta: { source: 'Qloo Insights API', origin, destination: city, instruction, strategy: copy.liveStrategy(instruction), note: copy.note } });
-  } catch (error) {
-    console.error(error);
-    return NextResponse.json({ error: 'Unexpected route refinement error.' }, { status: 500 });
+    return NextResponse.json({ items, meta: { source: 'Qloo Insights API', fallback: false, origin, destination: city, instruction, strategy: copy.liveStrategy(instruction), note: copy.note } });
+  } catch {
+    return NextResponse.json({ error: requestError(errorLocale) }, { status: 400 });
   }
 }

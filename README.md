@@ -68,16 +68,33 @@ TastePassport is designed to show more than a recommendation list. The **Taste T
 
 ## Qloo integration
 
-The backend is designed around the Qloo Insights API. With a valid key configured, the app calls Qloo for destination-aware cultural recommendations and maps the results into the route experience.
+All three backend routes call the Qloo Hackathon server at `https://hackathon.api.qloo.com`. The shared server client resolves taste names with `GET /search`, then sends the resolved IDs to `GET /v2/insights` with the destination filter. The API key is sent only in the `X-Api-Key` header; it is never returned to the browser or logged. The old `QLOO_BASE_URL` setting is no longer used.
+
+Requests have a 12-second overall deadline. Missing credentials, authentication failures, rate limits, malformed responses, empty matches and network errors use the existing localized demo responses with `meta.fallback: true`. Replacement excludes existing stop names. Refinement preserves time slots and requires enough distinct results; it never repeats a single live result to fill the day.
+
+Refinement recognizes the existing English, Russian, Ukrainian, Spanish and Chinese intent patterns. It translates budget and less-touristy requests into price/popularity filters and resolves category names through `/v2/tags`. Unsupported instructions or unavailable category tags use the labeled fallback. This is deterministic intent matching, not general LLM understanding. Route Fit percentages remain the application's presentation heuristics, not Qloo affinity scores; opening times and travel feasibility are not verified.
 
 Environment variables:
 
 ```env
 QLOO_API_KEY=your_key_here
-QLOO_BASE_URL=https://api.qloo.com/v2
+# Qloo server: https://hackathon.api.qloo.com (fixed server-side)
 ```
 
 API keys are never committed to the repository.
+
+### Vercel setup
+
+1. Open the `tastepassport-ai` project in the `taste-passport` Vercel team, then **Settings → Environment Variables**.
+2. Add `QLOO_API_KEY` with your hackathon key, enable **Sensitive**, and select **Production** (and **Preview** if you want live preview testing). Do not use a `NEXT_PUBLIC_` prefix or paste the key into source files, issues, or logs.
+3. Deploy the integration branch for preview testing, or merge it and deploy production. After changing the variable, use **Deployments → Redeploy** on a deployment containing the integration changes. Existing deployments do not pick up new environment values.
+4. Generate a route, replace a stop, and refine the route. Successful live responses report `meta.source: "Qloo Insights API"` and `meta.fallback: false`. A demo label indicates fallback, not a verified live connection.
+
+See [Vercel environment variables](https://vercel.com/docs/environment-variables/managing-environment-variables) and [sensitive variables](https://vercel.com/docs/environment-variables/sensitive-environment-variables).
+
+### Verification
+
+Run `npm ci`, `npm test`, and `npm run build`. Tests mock Qloo and cover all three routes, five fallback locales, live request parameters, replacement exclusions, refinement slot preservation, missing credentials, empty/insufficient results, invalid requests and upstream failures. A real-key smoke test must be run separately after configuring the environment.
 
 ## Tech stack
 
@@ -116,7 +133,7 @@ Create `.env.local`:
 
 ```env
 QLOO_API_KEY=your_key_here
-QLOO_BASE_URL=https://api.qloo.com/v2
+# Qloo server: https://hackathon.api.qloo.com (fixed server-side)
 ```
 
 Then run:
