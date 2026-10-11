@@ -1,4 +1,4 @@
-import { qlooPlaces, fallbackSource, requestError } from '../../lib/qloo';
+import { qlooPlaces, unchangedNote, requestError } from '../../lib/qloo';
 import { NextResponse } from 'next/server';
 import { normalizeLocale, type Locale } from '../../i18n';
 
@@ -101,19 +101,6 @@ function copyFor(locale: Locale) {
   };
 }
 
-function demoPool(city: string, interests: string[], index: number, locale: Locale) {
-  const seed = interests[index % Math.max(interests.length, 1)] || 'Taste DNA';
-  const copy = copyFor(locale);
-  const fits = [[92,88,84],[91,86,82],[90,85,81],[89,84,80],[88,83,79],[87,82,77]];
-  return (copy.pools[index] || copy.pools[0]).map((entry: string[], option: number) => ({
-    name: `${city} ${entry[0]}`,
-    type: entry[1],
-    bridge: `${seed} → ${entry[2]}`,
-    fit: fits[index]?.[option] ?? 84,
-    address: `${city} · ${copy.local}`,
-  }));
-}
-
 export async function POST(request: Request) {
   let errorLocale: Locale = 'en';
   try {
@@ -130,7 +117,8 @@ export async function POST(request: Request) {
     const currentItem: CurrentItem = body?.currentItem || {};
     const currentNames = Array.isArray(body?.currentNames) ? body.currentNames.map((name: unknown) => String(name).toLowerCase()) : [];
 
-    if (!likes || !city || !likes.split(/[,\n]/).some((value) => value.trim())) return NextResponse.json({ error: copy.required }, { status: 400 });
+    if (!likes || !city || !likes.split(/[,\n]/).some((value) => value.trim()) ||
+      typeof currentItem.name !== 'string' || !currentItem.name.trim()) return NextResponse.json({ error: copy.required }, { status: 400 });
 
     const interests = likes.split(/[,\n]/).map((x) => x.trim()).filter(Boolean).slice(0, 8);
 
@@ -139,16 +127,9 @@ export async function POST(request: Request) {
     const excluded = new Set([...currentNames, String(currentItem.name || '').toLowerCase()]);
     const entity = entities.find((candidate) => !excluded.has(candidate.name.toLowerCase()));
     if (!entity) {
-      const pool = demoPool(city, interests, index, locale);
-      const choice = pool.find((item: any) => !currentNames.includes(String(item.name).toLowerCase())) || pool[0];
-      const item = {
-        ...choice,
-        time: currentItem.time,
-        phase: currentItem.phase,
-        reason: replacementStyle === 'surprise' ? copy.demoSurprise : copy.demoCloser,
-        fit: replacementStyle === 'surprise' ? Math.max(72, Number(choice.fit) - 6) : choice.fit,
-      };
-      return NextResponse.json({ item, meta: { source: fallbackSource(locale), fallback: true, action: replacementStyle, note: replacementStyle === 'surprise' ? copy.noteSurprise : copy.noteCloser } });
+      return NextResponse.json({ item: currentItem, meta: {
+        changed: false, fallback: true, reason: 'no_matches_or_unavailable', note: unchangedNote(locale),
+      } });
     }
 
     const props = entity?.properties || {};
@@ -163,7 +144,7 @@ export async function POST(request: Request) {
       fit: replacementStyle === 'surprise' ? 78 : 91,
     };
 
-    return NextResponse.json({ item, meta: { source: 'Qloo Insights API', fallback: false, action: replacementStyle, origin, destination: city, note: replacementStyle === 'surprise' ? copy.noteSurprise : copy.noteCloser } });
+    return NextResponse.json({ item, meta: { changed: true, source: 'Qloo Insights API', fallback: false, action: replacementStyle, origin, destination: city, note: replacementStyle === 'surprise' ? copy.noteSurprise : copy.noteCloser } });
   } catch {
     return NextResponse.json({ error: requestError(errorLocale) }, { status: 400 });
   }

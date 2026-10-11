@@ -288,6 +288,10 @@ export default function Home() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || t.errorReplace);
 
+      if (data?.meta?.changed === false) {
+        setAgentMessage(data.meta.note || t.errorReplace);
+        return;
+      }
       setResult((current) => {
         if (!current?.items) return current;
         const nextItems = [...current.items];
@@ -337,6 +341,11 @@ export default function Home() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || t.errorRefine);
+
+      if (data?.meta?.changed === false) {
+        setAgentMessage(data.meta.note || t.errorRefine);
+        return;
+      }
 
       setResult((current) => {
         if (!current) return current;

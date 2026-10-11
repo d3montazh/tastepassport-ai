@@ -1,4 +1,4 @@
-import { qlooPlaces, fallbackSource, requestError } from '../../lib/qloo';
+import { qlooPlaces, unchangedNote, requestError } from '../../lib/qloo';
 import { NextResponse } from 'next/server';
 import { normalizeLocale, type Locale } from '../../i18n';
 
@@ -108,67 +108,6 @@ function copyFor(locale: Locale) {
   };
 }
 
-function demoRefine(city: string, interests: string[], instruction: string, currentItems: RouteItem[], locale: Locale) {
-  const intent = intentFromInstruction(instruction);
-  const copy = copyFor(locale);
-  const seed = interests[0] || copy.bridgeTaste;
-
-  return currentItems.map((item, index) => {
-    let name = item.name || `${city} ${copy.discovery}`;
-    let type = item.type || copy.discovery;
-    let reason = copy.defaultReason(instruction);
-    let bridge = item.bridge || `${seed} → ${city}`;
-    let fit = Math.max(72, Number(item.fit || 84));
-
-    if (intent.lessTouristy) {
-      name = `${city} ${copy.names.less[index] || copy.discovery}`;
-      reason = copy.lessReason;
-      bridge = `${seed} → ${copy.names.less[Math.min(index, copy.names.less.length - 1)]}`;
-      fit = Math.min(96, fit + 2);
-    }
-    if (intent.fashion) {
-      name = `${city} ${copy.names.fashion[index] || copy.discovery}`;
-      type = index === 2 ? copy.types.foodDesign : index === 5 ? copy.types.nightStyle : copy.types.fashion;
-      reason = copy.fashionReason;
-      bridge = `${interests[2] || seed} → ${copy.types.fashion}`;
-    }
-    if (intent.budget) {
-      name = `${city} ${copy.names.budget[index] || copy.discovery}`;
-      reason = copy.budgetReason;
-      bridge = `${seed} → ${copy.names.budget[Math.min(index, copy.names.budget.length - 1)]}`;
-    }
-    if (intent.nightlife && index >= 3) {
-      name = `${city} ${copy.names.night[index - 3] || copy.discovery}`;
-      type = index === 3 ? copy.types.artNight : index === 4 ? copy.types.musicEvening : copy.types.nightlife;
-      reason = copy.nightlifeReason;
-      bridge = `${seed} → ${city}`;
-    }
-    if (intent.food && (index === 1 || index === 2 || index === 5)) {
-      const pos = index === 1 ? 0 : index === 2 ? 1 : 2;
-      name = `${city} ${copy.names.food[pos]}`;
-      type = copy.types.food;
-      reason = copy.foodReason;
-      bridge = `${interests[3] || seed} → ${copy.types.food}`;
-    }
-    if (intent.music && (index === 0 || index === 4 || index === 5)) {
-      const pos = index === 0 ? 0 : index === 4 ? 1 : 2;
-      name = `${city} ${copy.names.music[pos]}`;
-      type = copy.types.music;
-      reason = copy.musicReason;
-      bridge = `${seed} → ${copy.types.music}`;
-    }
-    if (intent.art && (index === 1 || index === 3 || index === 4)) {
-      const pos = index === 1 ? 0 : index === 3 ? 1 : 2;
-      name = `${city} ${copy.names.art[pos]}`;
-      type = copy.types.art;
-      reason = copy.artReason;
-      bridge = `${interests[1] || seed} → ${copy.types.art}`;
-    }
-
-    return { ...item, name, type, reason, bridge, fit, address: `${city} · ${copy.refined}` };
-  });
-}
-
 export async function POST(request: Request) {
   let errorLocale: Locale = 'en';
   try {
@@ -183,19 +122,26 @@ export async function POST(request: Request) {
     const instruction = String(body?.instruction || '').trim();
     const currentItems: RouteItem[] = Array.isArray(body?.currentItems) ? body.currentItems.slice(0, 6) : [];
 
-    if (!likes || !city || !instruction || !currentItems.length) return NextResponse.json({ error: copy.required }, { status: 400 });
+    if (!likes || !city || !instruction || !currentItems.length ||
+      currentItems.some((item) => !item || typeof item.name !== 'string' || !item.name.trim())) {
+      return NextResponse.json({ error: copy.required }, { status: 400 });
+    }
 
     const interests = likes.split(/[,\n]/).map((x) => x.trim()).filter(Boolean).slice(0, 8);
     const intent = intentFromInstruction(instruction);
 
-    const categories = [intent.fashion && 'Fashion', intent.nightlife && 'Nightlife',
+    // Broad theme tags exist in Qloo but may have no matching places.
+    const categories = [intent.fashion && 'Clothing store', intent.nightlife && 'Night club',
       intent.food && 'Restaurant', intent.music && 'Music', intent.art && 'Art'].filter(Boolean) as string[];
     const supported = intent.lessTouristy || intent.budget || categories.length > 0;
     const entities = supported ? await qlooPlaces({ city, interests, take: 20, categories,
       budget: intent.budget, popularityMax: intent.lessTouristy || mode === 'unexpected' ? 0.65 : undefined }) : [];
     if (entities.length < currentItems.length) {
-      const items = demoRefine(city, interests, instruction, currentItems, locale);
-      return NextResponse.json({ items, meta: { source: fallbackSource(locale), fallback: true, origin, destination: city, instruction, strategy: copy.strategy(instruction), note: copy.note } });
+      return NextResponse.json({ items: currentItems, meta: {
+        changed: false, fallback: true,
+        reason: supported ? 'no_matches_or_unavailable' : 'unsupported_instruction',
+        note: unchangedNote(locale, !supported),
+      } });
     }
 
     const items = currentItems.map((current, index) => {
@@ -212,7 +158,7 @@ export async function POST(request: Request) {
       };
     });
 
-    return NextResponse.json({ items, meta: { source: 'Qloo Insights API', fallback: false, origin, destination: city, instruction, strategy: copy.liveStrategy(instruction), note: copy.note } });
+    return NextResponse.json({ items, meta: { changed: true, source: 'Qloo Insights API', fallback: false, origin, destination: city, instruction, strategy: copy.liveStrategy(instruction), note: copy.note } });
   } catch {
     return NextResponse.json({ error: requestError(errorLocale) }, { status: 400 });
   }
