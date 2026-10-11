@@ -48,7 +48,7 @@ function liveFetch(calls, entities = Array.from({ length: 8 }, (_, i) => ({
         : Response.json({ results: [{ entity_id: 'seed-id', name: 'Interstellar' }] });
     }
     if (url.pathname === '/v2/tags') return Response.json({ results: { tags: [
-      { tag_id: 'urn:tag:genre:place:restaurant', name: 'Restaurant' },
+      { id: 'urn:tag:genre:place:restaurant', name: 'Restaurant' },
     ] } });
     assert.equal(url.pathname, '/v2/insights');
     assert.equal(url.searchParams.get('signal.interests.entities'), 'seed-id');
@@ -67,6 +67,14 @@ test('all routes return localized fallback without a key and make no requests', 
       assert.equal(data.meta.fallback, true);
       assert.notEqual(data.meta.source, 'Qloo Insights API');
       assert.ok(data.item || data.items.length);
+      if (route !== 'recommend') {
+        assert.equal(data.meta.changed, false);
+        assert.equal(data.meta.source, undefined);
+        assert.equal(data.meta.strategy, undefined);
+        assert.ok(data.meta.note);
+        assert.deepEqual(route === 'refine' ? data.items : data.item,
+          route === 'refine' ? currentItems : currentItems[0]);
+      }
     }
   }
 });
@@ -121,6 +129,11 @@ test('all routes fall back safely on authentication, throttling, invalid JSON an
       assert.equal(data.meta.fallback, true);
       assert.equal(JSON.stringify(data).includes('private upstream body'), false);
       assert.equal(JSON.stringify(data).includes('test-placeholder'), false);
+      if (route !== 'recommend') {
+        assert.equal(data.meta.changed, false);
+        assert.deepEqual(route === 'refine' ? data.items : data.item,
+          route === 'refine' ? currentItems : currentItems[0]);
+      }
     }
   }
 });
@@ -132,6 +145,85 @@ test('empty, duplicate-only and insufficient results use fallback instead of rep
   global.fetch = liveFetch([], [currentItems[0], currentItems[0]]);
   assert.equal((await call('replace')).data.meta.fallback, true);
   assert.equal((await call('refine')).data.meta.fallback, true);
+  assert.deepEqual((await call('refine')).data.items, currentItems);
+});
+
+test('fashion resolves the actual Qloo id field and ignores same-name media tags', async () => {
+  process.env.QLOO_API_KEY = 'test-placeholder';
+  const calls = [];
+  const fetchLive = liveFetch(calls);
+  global.fetch = async (url, init) => url.pathname === '/v2/tags'
+    ? Response.json({ results: { tags: [
+      { id: 'urn:tag:genre:media:clothing_store', name: 'Clothing store', type: 'urn:tag:genre:media' },
+      { id: 'urn:tag:genre:place:clothing_store', name: 'Clothing store', type: 'urn:tag:genre:place' },
+      { id: 'urn:tag:category:place:clothing_store', name: 'Clothing store', type: 'urn:tag:category:place' },
+    ] } }) : fetchLive(url, init);
+  const { data } = await call('refine', { instruction: 'Больше моды и дизайна', locale: 'ru' });
+  assert.equal(data.meta.changed, true);
+  assert.equal(data.meta.fallback, false);
+  assert.equal(calls.at(-1).searchParams.get('filter.tags'), 'urn:tag:genre:place:clothing_store,urn:tag:category:place:clothing_store');
+  assert.equal(calls.at(-1).searchParams.get('operator.filter.tags'), 'union');
+  assert.deepEqual(data.items.map(i => [i.time, i.phase]), currentItems.map(i => [i.time, i.phase]));
+});
+
+test('unresolved category retains the full route, including addresses and explanation fields', async () => {
+  process.env.QLOO_API_KEY = 'test-placeholder';
+  const fetchLive = liveFetch([]);
+  global.fetch = async (url, init) => url.pathname === '/v2/tags'
+    ? Response.json({ results: { tags: [{ id: 'urn:tag:genre:media:fashion', name: 'Fashion' }] } })
+    : fetchLive(url, init);
+  const items = currentItems.map(i => ({ ...i, reason: 'Existing explanation', bridge: 'Existing bridge', fit: 81 }));
+  const { data } = await call('refine', { instruction: 'More fashion', currentItems: items });
+  assert.equal(data.meta.changed, false);
+  assert.deepEqual(data.items, items);
+});
+
+test('unsupported instructions keep the route and do not call Qloo', async () => {
+  process.env.QLOO_API_KEY = 'test-placeholder';
+  let requests = 0;
+  global.fetch = () => { requests++; throw new Error('Unexpected request'); };
+  const { data } = await call('refine', { instruction: 'Use only wheelchair-accessible places' });
+  assert.equal(requests, 0);
+  assert.equal(data.meta.reason, 'unsupported_instruction');
+  assert.equal(data.meta.changed, false);
+  assert.deepEqual(data.items, currentItems);
+});
+
+test('invalid current route items are rejected before searching', async () => {
+  assert.equal((await call('refine', { currentItems: [null] })).status, 400);
+  assert.equal((await call('replace', { currentItem: {} })).status, 400);
+});
+
+test('temporary rate limiting retries once and can recover a live refinement', async () => {
+  process.env.QLOO_API_KEY = 'test-placeholder';
+  const fetchLive = liveFetch([]);
+  let attempts = 0;
+  global.fetch = async (url, init) => {
+    if (url.pathname === '/v2/insights' && attempts++ === 0) {
+      return new Response('{}', { status: 429, headers: { 'Retry-After': '0' } });
+    }
+    return fetchLive(url, init);
+  };
+  const { data } = await call('refine');
+  assert.equal(attempts, 2);
+  assert.equal(data.meta.changed, true);
+});
+
+test('long Retry-After does not exceed the deadline or replace existing places', async () => {
+  process.env.QLOO_API_KEY = 'test-placeholder';
+  const fetchLive = liveFetch([]);
+  let attempts = 0;
+  global.fetch = async (url, init) => {
+    if (url.pathname === '/v2/insights') {
+      attempts++;
+      return new Response('{}', { status: 429, headers: { 'Retry-After': '60' } });
+    }
+    return fetchLive(url, init);
+  };
+  const { data } = await call('refine');
+  assert.equal(attempts, 1);
+  assert.equal(data.meta.changed, false);
+  assert.deepEqual(data.items, currentItems);
 });
 
 test('malformed JSON and missing inputs return a controlled client error', async () => {
