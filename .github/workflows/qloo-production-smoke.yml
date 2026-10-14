@@ -1,0 +1,61 @@
+name: Qloo Production smoke (sanitized)
+
+on:
+  push:
+    branches: [diagnostics/qloo-prod-smoke-20261014]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check public Production recommendation via server
+        env:
+          TEST_ENDPOINT: https://tastepassport-ai.vercel.app/api/recommend
+        run: |
+          node <<'NODE'
+          const scenarios = [
+            { id: "New York - mainstream music and fashion", city: "New York", likes: "The Weeknd, Prada" },
+            { id: "Paris - movie", city: "Paris", likes: "Blade Runner 2049" },
+          ];
+          async function run(item) {
+            const began = Date.now();
+            try {
+              const response = await fetch(process.env.TEST_ENDPOINT, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  likes: item.likes, city: item.city, origin: "London", mode: "balanced", locale: "en",
+                }),
+                signal: AbortSignal.timeout(27000),
+                redirect: "error",
+              });
+              let data;
+              try { data = await response.json(); } catch {}
+              const status = data?.meta?.qlooStatus ?? "not_present";
+              const report = {
+                case: item.id, http: response.status, elapsedMs: Date.now() - began,
+                qlooStatus: status,
+                source: data?.meta?.source === "Qloo Insights API" ? "Qloo" : data?.meta?.mixed ? "mixed" : data?.meta?.fallback ? "demo" : "unknown",
+                qlooStops: data?.meta?.audit?.qloo ?? null,
+                demoStops: data?.meta?.audit?.demo ?? null,
+                affinityStops: data?.meta?.audit?.withAffinity ?? null,
+                geocodedStops: data?.meta?.audit?.withCoordinates ?? null,
+                fallbackReason: data?.meta?.fallbackReason ?? null,
+              };
+              console.log("SANITIZED_QLOO_SMOKE " + JSON.stringify(report));
+              return status;
+            } catch(e) {
+              console.log("SANITIZED_QLOO_SMOKE " + JSON.stringify({case:item.id, outcome:"request_failed", kind:e?.name==="TimeoutError"?"timeout":"network_or_protection", elapsedMs:Date.now()-began}));
+              return "unreachable";
+            }
+          }
+          for (const item of scenarios) {
+            const status = await run(item);
+            if (["invalid_key","rate_limited","unreachable","timeout"].includes(status)) break;
+          }
+          NODE
