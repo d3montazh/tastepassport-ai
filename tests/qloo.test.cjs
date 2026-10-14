@@ -372,3 +372,63 @@ test('category refinement preserves demo provenance for unchanged stops', async 
   assert.match(data.meta.source, /демо/i);
   assert.equal(data.items[0].name, currentItems[0].name);
 });
+
+
+test('Qloo affinity is passed through only when upstream provides a valid numeric value', async () => {
+  process.env.QLOO_API_KEY = 'test-placeholder';
+  const entities = Array.from({ length: 8 }, (_, i) => ({
+    entity_id: `venue-${i}`, name: `Evidence venue ${i}`,
+    affinity: i === 0 ? 0.84 : undefined,
+    properties: { address: 'Real address', geocode: { latitude: 40.7, longitude: -74.0 } },
+  }));
+  global.fetch = liveFetch([], entities);
+  const { data } = await call('recommend');
+  assert.equal(data.meta.fallback, false);
+  assert.equal(data.items[0].fit, 84);
+  assert.equal(data.items[0].fitSource, 'qloo-affinity');
+  assert.deepEqual(data.items[0].coordinates, { lat: 40.7, lng: -74.0 });
+  assert.equal(data.items[1].fit, undefined);
+  assert.equal(data.items[1].fitSource, undefined);
+});
+
+test('demo route does not fabricate affinity values or geographic metadata', async () => {
+  delete process.env.QLOO_API_KEY;
+  global.fetch = () => { throw new Error('Do not call Qloo in demo mode'); };
+  const { data } = await call('recommend');
+  assert.equal(data.meta.fallback, true);
+  assert.ok(data.items.every(item => item.fit === undefined && item.fitSource === undefined && item.coordinates === undefined));
+});
+
+test('Qloo replacement carries actual affinity and coordinates without altering schedule', async () => {
+  process.env.QLOO_API_KEY = 'test-placeholder';
+  const entities = [{
+    entity_id: 'new1', name: 'A place with evidence', subtype: 'Museum',
+    affinity: 0.74, properties: { latitude: 48.85, longitude: 2.35 },
+  }];
+  global.fetch = liveFetch([], entities);
+  const { data } = await call('replace', { index: 0 });
+  assert.equal(data.meta.changed, true);
+  assert.equal(data.item.fit, 74);
+  assert.equal(data.item.fitSource, 'qloo-affinity');
+  assert.deepEqual(data.item.coordinates, { lat: 48.85, lng: 2.35 });
+  assert.equal(data.item.time, currentItems[0].time);
+});
+
+test('Qloo scoped refinement retains any other stops unchanged and provides score only for updated venue', async () => {
+  process.env.QLOO_API_KEY = 'test-placeholder';
+  const fetchLive = liveFetch([], [{
+    entity_id: 'store', name: 'A real clothing shop', subtype: 'Clothing store',
+    affinity: 0.62, properties: { latitude: 48.86, longitude: 2.34 },
+  }]);
+  global.fetch = async (url, init) => url.pathname === '/v2/tags'
+    ? Response.json({ results: { tags: [{ id: 'urn:tag:genre:place:clothing_store', name: 'Clothing store' }] } })
+    : fetchLive(url, init);
+  const original = currentItems.map(item => ({ ...item, fit: 0, reason: 'original', coordinates: { lat: 0, lng: 0 } }));
+  const { data } = await call('refine', { instruction: 'More fashion', currentItems: original });
+  assert.equal(data.meta.changed, true);
+  assert.equal(data.items[1].fit, 62);
+  assert.equal(data.items[1].fitSource, 'qloo-affinity');
+  assert.deepEqual(data.items[1].coordinates, { lat: 48.86, lng: 2.34 });
+  assert.deepEqual(data.items[0], original[0]);
+  assert.deepEqual(data.items[2], original[2]);
+});

@@ -3,6 +3,7 @@ import type { Locale } from '../i18n';
 // Server routes only: never import this module from a client component.
 const QLOO_SERVER = 'https://hackathon.api.qloo.com';
 export type QlooEntity = {
+  affinity?: number;
   entity_id?: string;
   name: string;
   type?: string;

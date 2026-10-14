@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { languages, normalizeLocale, uiCopy, type Locale } from './i18n';
+import { aerialDistanceKm, type Coordinate } from './lib/venue-evidence';
 
 type Mode = 'safe' | 'balanced' | 'unexpected';
 type ReplacementStyle = 'closer' | 'surprise';
@@ -15,6 +16,8 @@ type ResultItem = {
   phase?: string;
   bridge?: string;
   fit?: number;
+  fitSource?: 'qloo-affinity';
+  coordinates?: Coordinate;
 };
 
 type ResultPayload = {
@@ -31,6 +34,25 @@ type ResultPayload = {
     strategy?: string;
   };
 };
+
+const evidenceCopy: Record<Locale, {
+  score: string; scoreInfo: string; noScore: string; schedule: string;
+  distance: string; far: string; maps: string;
+}> = {
+  en: { score: 'Qloo affinity', scoreInfo: 'Qloo cultural affinity index, not the probability you will like this place.', noScore: 'No verified affinity score', schedule: 'Times are suggested. Opening hours and travel times have not been verified.', distance: 'From previous stop, straight line', far: 'Long gap between stops', maps: 'Open in Maps' },
+  ru: { score: 'Связь с твоим вкусом · Qloo', scoreInfo: 'Индекс культурной связи Qloo, а не вероятность того, что место тебе понравится.', noScore: 'Нет подтверждённой оценки', schedule: 'Время посещения примерное. Часы работы и время в пути не проверены.', distance: 'От предыдущего места по прямой', far: 'Большое расстояние между точками', maps: 'Открыть на карте' },
+  uk: { score: 'Зв’язок із твоїм смаком · Qloo', scoreInfo: 'Індекс культурного зв’язку Qloo, а не ймовірність того, що місце тобі сподобається.', noScore: 'Немає підтвердженої оцінки', schedule: 'Час відвідування орієнтовний. Години роботи й час у дорозі не перевірено.', distance: 'Від попереднього місця по прямій', far: 'Велика відстань між точками', maps: 'Відкрити на карті' },
+  es: { score: 'Afinidad Qloo', scoreInfo: 'Índice de afinidad cultural de Qloo; no es la probabilidad de que te guste.', noScore: 'Afinidad no disponible', schedule: 'Horarios sugeridos: no se han verificado horarios de apertura ni tiempos de viaje.', distance: 'Desde la parada anterior, en línea recta', far: 'Distancia larga entre paradas', maps: 'Abrir en el mapa' },
+  zh: { score: 'Qloo 品味关联', scoreInfo: 'Qloo 文化关联指数，并非你喜欢该地点的概率。', noScore: '缺少可核实的关联评分', schedule: '到访时间仅为建议；未核实营业时间及交通用时。', distance: '距上一站直线距离', far: '相邻站点距离较远', maps: '在地图中打开' },
+};
+
+function mapsLink(item: ResultItem, city: string): string {
+  const point = item.coordinates;
+  const query = point && Number.isFinite(point.lat) && Number.isFinite(point.lng)
+    ? `${point.lat},${point.lng}`
+    : [item.name, item.address, city].filter(Boolean).join(', ');
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+}
 
 const surpriseSeeds = [
   {
@@ -193,7 +215,7 @@ export default function Home() {
         signal: bridgeSignal || signals[index % signals.length],
         target: item.name,
         type: item.type || t.discoveryFallback,
-        fit: item.fit,
+        fit: item.fitSource === 'qloo-affinity' ? item.fit : undefined,
       };
     });
   }, [result, tasteTags, t.discoveryFallback]);
@@ -649,7 +671,10 @@ export default function Home() {
                       <strong>{link.signal}</strong>
                     </div>
                     <div className="taste-map-connection">
-                      <div className="taste-map-line" />
+                      <div className="taste-map-line">
+                          {typeof link.fit === 'number' && Number.isFinite(link.fit) && <i style={{ left: `${Math.max(0, Math.min(100, link.fit))}%` }} />}
+                        </div>
+                        {typeof link.fit === 'number' && Number.isFinite(link.fit) && <b title={evidenceCopy[locale].scoreInfo}>{link.fit}%</b>}
                     </div>
                     <div className="taste-map-node taste-map-target">
                       <small>{link.type}</small>
@@ -661,9 +686,12 @@ export default function Home() {
             </div>
           )}
 
+          <p className="route-evidence-note">{evidenceCopy[locale].schedule} {evidenceCopy[locale].scoreInfo}</p>
           <div className="route-line">
             {(result.items || []).map((item, i) => {
               const isReplacing = replacing?.index === i;
+              const distanceKm = i > 0 ? aerialDistanceKm(result.items?.[i - 1]?.coordinates, item.coordinates) : undefined;
+              const scoreAvailable = item.fitSource === 'qloo-affinity' && typeof item.fit === 'number' && Number.isFinite(item.fit);
               return (
                 <article className={`route-card ${isReplacing ? 'is-replacing' : ''}`} key={`${item.name}-${i}`}>
                   <div className="route-step">
@@ -674,20 +702,22 @@ export default function Home() {
                     <div className="route-time-row">
                       <div className="type">{item.type || t.discoveryFallback}</div>
                       {(item.time || item.phase) && (
-                        <div className="time-pill">{item.time || ''}{item.phase ? ` · ${item.phase}` : ''}</div>
+                        <div className="time-pill">{item.time ? `≈ ${item.time}` : ''}{item.phase ? ` · ${item.phase}` : ''}</div>
                       )}
                     </div>
                     <h3>{item.name}</h3>
                     {item.address && <div className="address">⌖ {item.address}</div>}
+                    <div className="address"><a href={mapsLink(item, city)} target="_blank" rel="noopener noreferrer">↗ {evidenceCopy[locale].maps}</a></div>
+                    {distanceKm !== undefined && <div className="address">{evidenceCopy[locale].distance}: ≈ {distanceKm.toFixed(1)} km{distanceKm > 5 ? ` · ${evidenceCopy[locale].far}` : ''}</div>}
                     <p>{item.reason || t.matchFallback}</p>
                     {item.bridge && <div className="bridge"><span>{t.tasteBridge}</span>{item.bridge}</div>}
-                    {typeof item.fit === 'number' && Number.isFinite(item.fit) && (
+                    {scoreAvailable ? (
                       <div className="match-row">
-                        <span>{t.routeFit}</span>
+                        <span title={evidenceCopy[locale].scoreInfo}>{evidenceCopy[locale].score}</span>
                         <div className="match-bar"><i style={{ width: `${Math.min(100, Math.max(0, item.fit))}%` }} /></div>
                         <b>{item.fit}%</b>
                       </div>
-                    )}
+                    ) : <div className="address" title={evidenceCopy[locale].scoreInfo}>{evidenceCopy[locale].noScore}</div>}
 
                     <div className="agent-actions">
                       <span>{t.adaptStop}</span>
