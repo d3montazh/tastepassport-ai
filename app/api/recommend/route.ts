@@ -1,6 +1,7 @@
 import { selectItinerary } from '../../lib/route-quality';
 import { qlooPlaces, fallbackSource, requestError } from '../../lib/qloo';
 import { NextResponse } from 'next/server';
+import { displayPlaceType, summarizeRoute } from '../../lib/route-audit';
 import { qlooAffinityPercent, qlooCoordinates } from '../../lib/venue-evidence';
 import { normalizeLocale, type Locale } from '../../i18n';
 
@@ -143,6 +144,7 @@ function demoItems(city: string, origin: string, interests: string[], mode: stri
   return c.demo.map((template: any, index: number) => ({
     name: template.name(city),
     type: template.type,
+    provenance: 'demo' as const,
     reason: template.reason(signals[index], mode, city, origin),
     address: template.address(city),
     bridge: template.bridge(signals[index], mode, city, origin),
@@ -182,6 +184,8 @@ export async function POST(request: Request) {
         summary: c.summary(city, interests),
         items,
         meta: {
+          audit: summarizeRoute(items),
+          fallbackReason: 'qloo_unavailable_or_no_results',
           source: fallbackSource(locale),
           fallback: true,
           mode,
@@ -197,6 +201,8 @@ export async function POST(request: Request) {
     if (!selected.length) {
       const items = demoItems(city, origin, interests, mode, locale);
       return NextResponse.json({ summary: c.summary(city, interests), items, meta: {
+        audit: summarizeRoute(items),
+        fallbackReason: 'insufficient_compatible_venues',
         source: fallbackSource(locale), fallback: true, mode, matched: items.length,
         origin, destination: city, strategy: c.strategy,
       } });
@@ -205,7 +211,8 @@ export async function POST(request: Request) {
       const props = entity?.properties || {};
       return {
         name: entity?.name || `Discovery ${index + 1}`,
-        type: entity?.subtype || entity?.type || props?.subtype || 'Place',
+        type: displayPlaceType(entity.type, entity.subtype, props, locale === 'ru' ? 'Место' : locale === 'uk' ? 'Місце' : 'Place'),
+        provenance: 'qloo' as const,
         reason: reasonFor(entity, mode, locale),
         address: props?.address || props?.formatted_address || null,
         time: routeTimes[index],
@@ -221,7 +228,7 @@ export async function POST(request: Request) {
       summary: c.summary(city, interests),
       items,
       meta: {
-        source: 'Qloo Insights API', fallback: false,
+        source: 'Qloo Insights API', fallback: false, audit: summarizeRoute(items),
         mode,
         matched: items.length,
         origin,
