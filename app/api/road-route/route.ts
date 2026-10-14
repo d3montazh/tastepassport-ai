@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { configuredOsrmBase } from '../../lib/osrm-config';
 
 export const runtime = 'nodejs';
 
@@ -9,18 +10,6 @@ function validCoordinate(value: unknown): value is Coordinate {
   return typeof p.lat === 'number' && Number.isFinite(p.lat) && Math.abs(p.lat) <= 90 &&
     typeof p.lng === 'number' && Number.isFinite(p.lng) && Math.abs(p.lng) <= 180;
 }
-export function configuredOsrmBase(raw: string | undefined): URL | undefined {
-  if (!raw) return undefined;
-  try {
-    const url = new URL(raw);
-    // Never use unsecured public test servers as a production dependency.
-    if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) return undefined;
-    if (['localhost', '127.0.0.1', '::1', 'router.project-osrm.org', 'routing.openstreetmap.de'].includes(url.hostname.toLowerCase())) return undefined;
-    if (!url.hostname.includes('.')) return undefined;
-    return url;
-  } catch { return undefined; }
-}
-
 export async function POST(request: Request) {
   try {
     const payload = await request.json();
