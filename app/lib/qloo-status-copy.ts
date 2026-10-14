@@ -1,0 +1,80 @@
+import type { Locale } from '../i18n';
+import type { QlooStatus } from './qloo';
+
+const copy: Record<Locale, Record<Exclude<QlooStatus, 'ok'> | 'insufficient_compatible_venues', string>> = {
+  en: {
+    missing_key: 'Qloo is not configured in this deployment.',
+    invalid_key: 'Qloo rejected the configured credential (401/403). Rotate the key and update Vercel Production.',
+    rate_limited: 'Qloo rate limit reached. Wait and try again.',
+    upstream_rejected: 'Qloo rejected a request; the query parameters may need adjustment.',
+    upstream_unavailable: 'Qloo service returned a server error. Try again later.',
+    timeout: 'Qloo did not respond within the request deadline.',
+    network_error: 'The server could not connect to Qloo.',
+    no_interest_matches: 'Qloo could not match the selected cultural interests.',
+    no_category_matches: 'Qloo could not match the requested venue categories.',
+    no_results: 'Qloo returned no qualifying places in the selected city.',
+    unexpected_response: 'Qloo returned an unexpected response structure.',
+    insufficient_compatible_venues: 'Qloo returned places but not enough compatible categories for the full route.',
+  },
+  ru: {
+    missing_key: 'Для этого развёртывания не настроен ключ Qloo.',
+    invalid_key: 'Qloo отклонил ключ (401/403). Нужно перевыпустить ключ и обновить его в Vercel Production.',
+    rate_limited: 'Достигнут лимит запросов Qloo. Попробуй позже.',
+    upstream_rejected: 'Qloo отклонил запрос: вероятно, нужно исправить его параметры.',
+    upstream_unavailable: 'Сервер Qloo вернул ошибку. Попробуй позже.',
+    timeout: 'Qloo не ответил за отведённое время.',
+    network_error: 'Сервер приложения не смог подключиться к Qloo.',
+    no_interest_matches: 'Qloo не распознал выбранные культурные интересы.',
+    no_category_matches: 'Qloo не распознал нужные категории заведений.',
+    no_results: 'Qloo не нашёл подходящих заведений в выбранном городе.',
+    unexpected_response: 'Qloo вернул ответ в неожиданном формате.',
+    insufficient_compatible_venues: 'Qloo нашёл места, но их категорий недостаточно для полного маршрута.',
+  },
+  uk: {
+    missing_key: 'Для цього розгортання не налаштовано ключ Qloo.',
+    invalid_key: 'Qloo відхилив ключ (401/403). Перевипусти його та онови у Vercel Production.',
+    rate_limited: 'Вичерпано ліміт запитів Qloo. Спробуй пізніше.',
+    upstream_rejected: 'Qloo відхилив запит: можливо, потрібно змінити параметри.',
+    upstream_unavailable: 'Сервер Qloo повернув помилку. Спробуй пізніше.',
+    timeout: 'Qloo не відповів за відведений час.',
+    network_error: 'Сервер застосунку не зміг підключитися до Qloo.',
+    no_interest_matches: 'Qloo не розпізнав вибрані культурні інтереси.',
+    no_category_matches: 'Qloo не розпізнав потрібні категорії закладів.',
+    no_results: 'Qloo не знайшов відповідних закладів у вибраному місті.',
+    unexpected_response: 'Qloo повернув відповідь у неочікуваному форматі.',
+    insufficient_compatible_venues: 'Qloo знайшов місця, але їхніх категорій недостатньо для повного маршруту.',
+  },
+  es: {
+    missing_key: 'No hay una clave Qloo configurada en este despliegue.',
+    invalid_key: 'Qloo rechazó la clave (401/403). Rótala y actualízala en Vercel Production.',
+    rate_limited: 'Se alcanzó el límite de peticiones Qloo. Inténtalo más tarde.',
+    upstream_rejected: 'Qloo rechazó la solicitud; revisa los parámetros de consulta.',
+    upstream_unavailable: 'El servidor Qloo devolvió un error.',
+    timeout: 'Qloo no respondió a tiempo.',
+    network_error: 'El servidor no pudo conectarse con Qloo.',
+    no_interest_matches: 'Qloo no reconoció tus intereses culturales.',
+    no_category_matches: 'Qloo no reconoció las categorías solicitadas.',
+    no_results: 'Qloo no encontró lugares adecuados en la ciudad.',
+    unexpected_response: 'Qloo devolvió un formato de respuesta inesperado.',
+    insufficient_compatible_venues: 'Qloo no encontró suficientes categorías compatibles para toda la ruta.',
+  },
+  zh: {
+    missing_key: '当前部署未配置 Qloo 密钥。',
+    invalid_key: 'Qloo 拒绝了密钥（401/403）。请重新生成密钥并更新 Vercel Production。',
+    rate_limited: 'Qloo 已达到请求限制，请稍后再试。',
+    upstream_rejected: 'Qloo 拒绝了请求，请检查查询参数。',
+    upstream_unavailable: 'Qloo 服务器返回错误。',
+    timeout: 'Qloo 请求超时。',
+    network_error: '应用服务器无法连接到 Qloo。',
+    no_interest_matches: 'Qloo 无法识别所选文化兴趣。',
+    no_category_matches: 'Qloo 无法识别所选场所类别。',
+    no_results: 'Qloo 未找到该城市中合适的地点。',
+    unexpected_response: 'Qloo 返回了意外的数据格式。',
+    insufficient_compatible_venues: 'Qloo 找到了地点，但类别不足以组成完整路线。',
+  },
+};
+
+export function qlooStatusMessage(locale: Locale, status: QlooStatus | 'insufficient_compatible_venues' | undefined) {
+  if (!status || status === 'ok') return '';
+  return copy[locale][status] || '';
+}
