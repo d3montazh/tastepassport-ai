@@ -70,3 +70,36 @@ jobs:
             if (["invalid_key","rate_limited","unreachable","timeout"].includes(status)) break;
           }
           NODE
+
+      - name: Check art-category refinement without exposing venue data
+        env:
+          TEST_ENDPOINT: https://tastepassport-ai.vercel.app/api/refine
+        run: |
+          node <<'NODE'
+          const items = Array.from({length:6},(_,i)=>({
+            name:'Diagnostic placeholder ' + i, type:'Demo',
+            provenance:'demo', time:'12:00',
+          }));
+          for (const instruction of ['More art', 'More music']) {
+            try {
+              const response = await fetch(process.env.TEST_ENDPOINT,{
+                method:'POST',headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({
+                  city:'New York',origin:'London',likes:'The Weeknd, Prada',
+                  mode:'balanced',locale:'en',currentItems:items,
+                  instruction, currentFallback:true,
+                }),
+                signal:AbortSignal.timeout(28000),redirect:'error'
+              });
+              const result = await response.json();
+              console.log('SANITIZED_QLOO_CATEGORY ' + JSON.stringify({
+                instruction,http:response.status,changed:result?.meta?.changed??false,
+                indices:result?.meta?.updatedIndices??[],reason:result?.meta?.reason??null,
+              }));
+            }catch(e){
+              console.log('SANITIZED_QLOO_CATEGORY ' + JSON.stringify({
+                instruction, outcome:e?.name==='TimeoutError'?'timeout':'request_failed'
+              }));
+            }
+          }
+          NODE
