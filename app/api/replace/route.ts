@@ -1,6 +1,7 @@
 import { selectForSlot } from '../../lib/route-quality';
 import { qlooPlaces, unchangedNote, requestError, mixedSource } from '../../lib/qloo';
 import { NextResponse } from 'next/server';
+import { qlooAffinityPercent, qlooCoordinates } from '../../lib/venue-evidence';
 import { normalizeLocale, type Locale } from '../../i18n';
 
 type QlooEntity = {
@@ -142,7 +143,9 @@ export async function POST(request: Request) {
       phase: currentItem.phase,
       reason: replacementStyle === 'surprise' ? copy.liveSurprise : copy.liveCloser,
       bridge: `${interests[index % Math.max(interests.length, 1)] || 'Taste DNA'} → ${city} ${copy.bridge}`,
-      fit: undefined,
+      fit: qlooAffinityPercent(entity),
+      fitSource: qlooAffinityPercent(entity) !== undefined ? 'qloo-affinity' : undefined,
+      coordinates: qlooCoordinates(entity),
     };
 
     const mixed = Boolean(body?.currentFallback || body?.currentMixed);
