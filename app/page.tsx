@@ -671,7 +671,10 @@ export default function Home() {
                       <strong>{link.signal}</strong>
                     </div>
                     <div className="taste-map-connection">
-                      <div className="taste-map-line" />
+                      <div className="taste-map-line">
+                          {typeof link.fit === 'number' && Number.isFinite(link.fit) && <i style={{ left: `${Math.max(0, Math.min(100, link.fit))}%` }} />}
+                        </div>
+                        {typeof link.fit === 'number' && Number.isFinite(link.fit) && <b title={evidenceCopy[locale].scoreInfo}>{link.fit}%</b>}
                     </div>
                     <div className="taste-map-node taste-map-target">
                       <small>{link.type}</small>
