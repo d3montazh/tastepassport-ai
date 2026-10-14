@@ -1,5 +1,5 @@
 import { selectItinerary } from '../../lib/route-quality';
-import { qlooPlaces, fallbackSource, requestError } from '../../lib/qloo';
+import { qlooPlacesWithStatus, fallbackSource, requestError } from '../../lib/qloo';
 import { NextResponse } from 'next/server';
 import { displayPlaceType, summarizeRoute } from '../../lib/route-audit';
 import { qlooAffinityPercent, qlooCoordinates } from '../../lib/venue-evidence';
@@ -176,7 +176,7 @@ export async function POST(request: Request) {
       .slice(0, 8);
     const c = copyFor(locale);
 
-    const entities = await qlooPlaces({ city, interests, take: 24,
+    const { entities, status: qlooStatus } = await qlooPlacesWithStatus({ city, interests, take: 24,
       popularityMax: mode === 'unexpected' ? 0.82 : undefined });
     if (!entities.length) {
       const items = demoItems(city, origin, interests, mode, locale);
@@ -186,6 +186,7 @@ export async function POST(request: Request) {
         meta: {
           audit: summarizeRoute(items),
           fallbackReason: 'qloo_unavailable_or_no_results',
+          qlooStatus,
           source: fallbackSource(locale),
           fallback: true,
           mode,
@@ -203,6 +204,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ summary: c.summary(city, interests), items, meta: {
         audit: summarizeRoute(items),
         fallbackReason: 'insufficient_compatible_venues',
+        qlooStatus: 'insufficient_compatible_venues',
         source: fallbackSource(locale), fallback: true, mode, matched: items.length,
         origin, destination: city, strategy: c.strategy,
       } });

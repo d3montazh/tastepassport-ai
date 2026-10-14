@@ -6,6 +6,8 @@ import { aerialDistanceKm, type Coordinate } from './lib/venue-evidence';
 import { SAVED_ROUTE_KEY, parseSavedRoute, routeShareText, type SavedRoute } from './lib/route-storage';
 import { summarizeRoute } from './lib/route-audit';
 import RouteMap from './components/route-map';
+import { qlooStatusMessage } from './lib/qloo-status-copy';
+import type { QlooStatus } from './lib/qloo';
 
 type Mode = 'safe' | 'balanced' | 'unexpected';
 type ReplacementStyle = 'closer' | 'surprise';
@@ -37,6 +39,7 @@ type ResultPayload = {
     destination?: string;
     strategy?: string;
     fallbackReason?: 'qloo_unavailable_or_no_results' | 'insufficient_compatible_venues';
+    qlooStatus?: QlooStatus | 'insufficient_compatible_venues';
   };
 };
 
@@ -659,7 +662,13 @@ export default function Home() {
             </div>
             <div className="result-meta">
               <span>{result.meta?.source || 'Qloo Insights API'}</span>
-              <b>{result.meta?.matched ?? result.items?.length ?? 0} {t.matches}</b>
+              <b>{result.meta?.fallback
+                ? (locale === 'ru' ? `${audit.demo} демо-точек`
+                    : locale === 'uk' ? `${audit.demo} демо-зупинок`
+                    : locale === 'es' ? `${audit.demo} paradas de prueba`
+                    : locale === 'zh' ? `${audit.demo} 个演示地点`
+                    : `${audit.demo} demo stops`)
+                : `${result.meta?.matched ?? result.items?.length ?? 0} ${t.matches}`}</b>
             </div>
           </div>
 
@@ -681,7 +690,8 @@ export default function Home() {
               <span>{qualityCopy[locale].coords}: <b>{audit.withCoordinates}/{audit.total}</b></span>
             </div>
             <p>{qualityCopy[locale].disclaimer}</p>
-            {result.meta?.fallbackReason && <p>
+            {result.meta?.qlooStatus && <p role="status">{qlooStatusMessage(locale, result.meta.qlooStatus)}</p>}
+            {result.meta?.fallbackReason && !result.meta?.qlooStatus && <p>
               {result.meta.fallbackReason === 'insufficient_compatible_venues'
                 ? (locale === 'ru' ? 'Qloo не дал достаточно мест нужных категорий для полного маршрута; показан демо-вариант.'
                   : locale === 'uk' ? 'Qloo не повернув достатньо місць потрібних категорій; показано демо-маршрут.'
