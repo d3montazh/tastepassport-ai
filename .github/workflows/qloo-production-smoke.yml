@@ -46,6 +46,17 @@ jobs:
                 affinityStops: data?.meta?.audit?.withAffinity ?? null,
                 geocodedStops: data?.meta?.audit?.withCoordinates ?? null,
                 fallbackReason: data?.meta?.fallbackReason ?? null,
+                qlooCandidates: data?.meta?.qlooCandidateCoverage?.returned ?? null,
+                eligiblePerSlot: data?.meta?.qlooCandidateCoverage?.compatiblePerSlot ?? null,
+                fields: {
+                  parsedGeo: data?.meta?.qlooCandidateCoverage?.withParsedCoordinates ?? null,
+                  address: data?.meta?.qlooCandidateCoverage?.withAddress ?? null,
+                  geocode: data?.meta?.qlooCandidateCoverage?.withGeocodeField ?? null,
+                  location: data?.meta?.qlooCandidateCoverage?.withLocationField ?? null,
+                  coordinates: data?.meta?.qlooCandidateCoverage?.withCoordinatesField ?? null,
+                  geometry: data?.meta?.qlooCandidateCoverage?.withGeometryField ?? null,
+                  rootGeometry: data?.meta?.qlooCandidateCoverage?.withRootGeometry ?? null,
+                },
               };
               console.log("SANITIZED_QLOO_SMOKE " + JSON.stringify(report));
               return status;
