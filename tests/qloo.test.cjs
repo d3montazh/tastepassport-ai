@@ -233,3 +233,47 @@ test('malformed JSON and missing inputs return a controlled client error', async
     assert.equal((await call(route, { likes: '' })).status, 400);
   }
 });
+
+test('role guard rejects obvious venue mismatches and keeps unknown categories conservative', () => {
+  const { selectForSlot, selectItinerary } = require('../app/lib/route-quality.ts');
+  const hotel = { name: 'Hotel Stop', subtype: 'Hotel' };
+  const gallery = { name: 'Art Center', subtype: 'Art gallery' };
+  const cafe = { name: 'Neighborhood Cafe', subtype: 'Cafe' };
+  const club = { name: 'Club One', subtype: 'Night club' };
+  assert.equal(selectForSlot([hotel, gallery, cafe], 2)?.name, 'Neighborhood Cafe');
+  assert.equal(selectForSlot([cafe, club], 5)?.name, 'Club One');
+  assert.equal(selectForSlot([hotel, gallery], 2), undefined);
+  assert.equal(selectForSlot([{ name: 'Unknown venue' }], 2)?.name, 'Unknown venue');
+  assert.equal(selectItinerary([gallery, hotel, cafe], 3).length, 0);
+});
+
+test('live recommend rejects a hotel in a meal slot instead of presenting an invalid route', async () => {
+  process.env.QLOO_API_KEY = 'test-placeholder';
+  const entities = Array.from({ length: 8 }, (_, i) => ({
+    entity_id: `venue-${i}`, name: `Venue ${i}`,
+    subtype: i === 2 ? 'Hotel' : undefined,
+    properties: { address: `Street ${i}` },
+  }));
+  global.fetch = liveFetch([], entities);
+  const { data } = await call('recommend');
+  assert.equal(data.meta.fallback, true);
+  assert.notEqual(data.meta.source, 'Qloo Insights API');
+});
+
+test('replacement keeps current stop when category is inappropriate', async () => {
+  process.env.QLOO_API_KEY = 'test-placeholder';
+  global.fetch = liveFetch([], Array.from({ length: 8 }, (_, i) => ({
+    entity_id: `hotel-${i}`, name: `Hotel ${i}`, subtype: 'Hotel',
+  })));
+  const { data } = await call('replace', { index: 2 });
+  assert.equal(data.meta.changed, false);
+  assert.deepEqual(data.item, currentItems[0]);
+});
+
+test('API does not invent numerical taste fit for live venues', async () => {
+  process.env.QLOO_API_KEY = 'test-placeholder';
+  global.fetch = liveFetch([]);
+  const { data } = await call('recommend');
+  assert.equal(data.meta.fallback, false);
+  assert.ok(data.items.every(item => item.fit === undefined));
+});
