@@ -8,7 +8,8 @@ require.extensions['.ts'] = (module, file) => {
   });
   module._compile(output.outputText, file);
 };
-const { configuredOsrmBase, POST } = require('../app/api/road-route/route.ts');
+const { POST } = require('../app/api/road-route/route.ts');
+const { configuredOsrmBase } = require('../app/lib/osrm-config.ts');
 const originalConfig = process.env.ROUTING_OSRM_BASE_URL;
 const originalFetch = global.fetch;
 after(() => {
