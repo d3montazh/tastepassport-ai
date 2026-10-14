@@ -148,7 +148,7 @@ function demoItems(city: string, origin: string, interests: string[], mode: stri
     reason: template.reason(signals[index], mode, city, origin),
     address: template.address(city),
     bridge: template.bridge(signals[index], mode, city, origin),
-    fit: index === 0 ? 94 : index === 1 ? 89 : index === 2 ? 86 : index === 3 ? 82 : index === 4 ? 79 : mode === 'unexpected' ? 74 : 84,
+    fit: undefined,
     time: routeTimes[index],
     phase: c.phases[index],
   }));
