@@ -277,3 +277,74 @@ test('API does not invent numerical taste fit for live venues', async () => {
   assert.equal(data.meta.fallback, false);
   assert.ok(data.items.every(item => item.fit === undefined));
 });
+
+
+test('fashion refinement updates shopping only and keeps all other stops untouched', async () => {
+  process.env.QLOO_API_KEY = 'test-placeholder';
+  const entities = Array.from({ length: 8 }, (_, i) => ({
+    entity_id: `fashion-${i}`, name: `Fashion ${i}`, subtype: 'Clothing store',
+    properties: { address: `Style street ${i}` },
+  }));
+  const fetchLive = liveFetch([], entities);
+  global.fetch = async (url, init) => url.pathname === '/v2/tags'
+    ? Response.json({ results: { tags: [
+        { id: 'urn:tag:genre:place:clothing_store', name: 'Clothing store' },
+      ] } })
+    : fetchLive(url, init);
+  const original = currentItems.map(item => ({ ...item, bridge: 'Original bridge', reason: 'Original reason', fit: 80 }));
+  const { data } = await call('refine', { instruction: 'Больше моды', currentItems: original });
+  assert.equal(data.meta.changed, true);
+  assert.deepEqual(data.meta.updatedIndices, [1]);
+  assert.equal(data.items[1].name, 'Fashion 0');
+  assert.equal(data.items[1].time, original[1].time);
+  for (let i = 0; i < original.length; i++) {
+    if (i !== 1) assert.deepEqual(data.items[i], original[i]);
+  }
+});
+
+test('nightlife refinement updates evening slot, not the full itinerary', async () => {
+  process.env.QLOO_API_KEY = 'test-placeholder';
+  const entities = Array.from({ length: 8 }, (_, i) => ({
+    entity_id: `club-${i}`, name: `Club ${i}`, subtype: 'Night club',
+    properties: { address: `Evening street ${i}` },
+  }));
+  const fetchLive = liveFetch([], entities);
+  global.fetch = async (url, init) => url.pathname === '/v2/tags'
+    ? Response.json({ results: { tags: [
+        { id: 'urn:tag:genre:place:night_club', name: 'Night club' },
+      ] } })
+    : fetchLive(url, init);
+  const { data } = await call('refine', { instruction: 'Больше ночной жизни' });
+  assert.equal(data.meta.changed, true);
+  assert.deepEqual(data.meta.updatedIndices, [5]);
+  assert.equal(data.items[5].name, 'Club 0');
+  assert.deepEqual(data.items.slice(0, 5), currentItems.slice(0, 5));
+});
+
+test('a category-constrained refinement does not replace stops with hotels', async () => {
+  process.env.QLOO_API_KEY = 'test-placeholder';
+  const fetchLive = liveFetch([], Array.from({ length: 8 }, (_, i) =>
+    ({ entity_id: `hotel-${i}`, name: `Hotel ${i}`, subtype: 'Hotel' })));
+  global.fetch = async (url, init) => url.pathname === '/v2/tags'
+    ? Response.json({ results: { tags: [
+        { id: 'urn:tag:genre:place:clothing_store', name: 'Clothing store' },
+      ] } })
+    : fetchLive(url, init);
+  const { data } = await call('refine', { instruction: 'More fashion' });
+  assert.equal(data.meta.changed, false);
+  assert.deepEqual(data.items, currentItems);
+});
+
+test('Qloo internal explainability keys never appear in recommendation reasons', async () => {
+  process.env.QLOO_API_KEY = 'test-placeholder';
+  const entities = Array.from({ length: 8 }, (_, i) => ({
+    entity_id: `place-${i}`, name: `Real place ${i}`,
+    query: { explainability: { 'signal.interests.entities': true, arbitrary_internal_key: true } },
+    properties: { address: `Address ${i}` },
+  }));
+  global.fetch = liveFetch([], entities);
+  const { data } = await call('recommend', { locale: 'en' });
+  assert.equal(data.meta.fallback, false);
+  assert.ok(data.items.every(item => !item.reason.includes('signal.interests.entities')));
+  assert.ok(data.items.every(item => !item.reason.includes('arbitrary_internal_key')));
+});
