@@ -24,6 +24,7 @@ type ResultItem = {
   fit?: number;
   fitSource?: 'qloo-affinity';
   coordinates?: Coordinate;
+  coordinatesApproximate?: boolean;
   provenance?: 'qloo' | 'demo';
 };
 
@@ -42,6 +43,7 @@ type ResultPayload = {
     fallbackReason?: 'qloo_unavailable_or_no_results' | 'insufficient_compatible_venues';
     qlooStatus?: QlooStatus | 'insufficient_compatible_venues';
     qlooCandidateCoverage?: CandidateCoverage;
+    qlooRescue?: { attempted: boolean; status: string; resolvedTags: number; newCandidates: number };
   };
 };
 
@@ -70,13 +72,13 @@ const routeStorageCopy: Record<Locale, {
 
 const evidenceCopy: Record<Locale, {
   score: string; scoreInfo: string; noScore: string; schedule: string;
-  distance: string; far: string; maps: string; demoLocation: string; missingLocation: string;
+  distance: string; far: string; maps: string; demoLocation: string; missingLocation: string; approximateLocation: string;
 }> = {
-  en: { score: 'Qloo affinity', scoreInfo: 'Qloo cultural affinity index, not the probability you will like this place.', noScore: 'No verified affinity score', schedule: 'Times are suggested. Opening hours and travel times have not been verified.', distance: 'From previous stop, straight line', far: 'Long gap between stops', maps: 'Find on Maps', demoLocation: 'Demo idea — no real venue location', missingLocation: 'Map location unavailable' },
-  ru: { score: 'Связь с твоим вкусом · Qloo', scoreInfo: 'Индекс культурной связи Qloo, а не вероятность того, что место тебе понравится.', noScore: 'Нет подтверждённой оценки', schedule: 'Время посещения примерное. Часы работы и время в пути не проверены.', distance: 'От предыдущего места по прямой', far: 'Большое расстояние между точками', maps: 'Найти на карте', demoLocation: 'Демо-идея — адрес не подтверждён', missingLocation: 'Местоположение для карты недоступно' },
-  uk: { score: 'Зв’язок із твоїм смаком · Qloo', scoreInfo: 'Індекс культурного зв’язку Qloo, а не ймовірність того, що місце тобі сподобається.', noScore: 'Немає підтвердженої оцінки', schedule: 'Час відвідування орієнтовний. Години роботи й час у дорозі не перевірено.', distance: 'Від попереднього місця по прямій', far: 'Велика відстань між точками', maps: 'Знайти на карті', demoLocation: 'Демо-ідея — адресу не підтверджено', missingLocation: 'Розташування для карти недоступне' },
-  es: { score: 'Afinidad Qloo', scoreInfo: 'Índice de afinidad cultural de Qloo; no es la probabilidad de que te guste.', noScore: 'Afinidad no disponible', schedule: 'Horarios sugeridos: no se han verificado horarios de apertura ni tiempos de viaje.', distance: 'Desde la parada anterior, en línea recta', far: 'Distancia larga entre paradas', maps: 'Buscar en el mapa', demoLocation: 'Idea demo — sin ubicación verificada', missingLocation: 'No se dispone de ubicación en el mapa' },
-  zh: { score: 'Qloo 品味关联', scoreInfo: 'Qloo 文化关联指数，并非你喜欢该地点的概率。', noScore: '缺少可核实的关联评分', schedule: '到访时间仅为建议；未核实营业时间及交通用时。', distance: '距上一站直线距离', far: '相邻站点距离较远', maps: '在地图中搜索', demoLocation: '演示创意 — 无已确认位置', missingLocation: '无法提供地图位置' },
+  en: { score: 'Qloo affinity', scoreInfo: 'Qloo cultural affinity index, not the probability you will like this place.', noScore: 'No verified affinity score', schedule: 'Times are suggested. Opening hours and travel times have not been verified.', distance: 'From previous stop, straight line', far: 'Long gap between stops', maps: 'Find on Maps', demoLocation: 'Demo idea — no real venue location', missingLocation: 'Map location unavailable', approximateLocation: 'Approximate position from a geohash; check the address.' },
+  ru: { score: 'Связь с твоим вкусом · Qloo', scoreInfo: 'Индекс культурной связи Qloo, а не вероятность того, что место тебе понравится.', noScore: 'Нет подтверждённой оценки', schedule: 'Время посещения примерное. Часы работы и время в пути не проверены.', distance: 'От предыдущего места по прямой', far: 'Большое расстояние между точками', maps: 'Найти на карте', demoLocation: 'Демо-идея — адрес не подтверждён', missingLocation: 'Местоположение для карты недоступно', approximateLocation: 'Приблизительная точка по геокоду; проверь адрес.' },
+  uk: { score: 'Зв’язок із твоїм смаком · Qloo', scoreInfo: 'Індекс культурного зв’язку Qloo, а не ймовірність того, що місце тобі сподобається.', noScore: 'Немає підтвердженої оцінки', schedule: 'Час відвідування орієнтовний. Години роботи й час у дорозі не перевірено.', distance: 'Від попереднього місця по прямій', far: 'Велика відстань між точками', maps: 'Знайти на карті', demoLocation: 'Демо-ідея — адресу не підтверджено', missingLocation: 'Розташування для карти недоступне', approximateLocation: 'Приблизна точка за геокодом; перевір адресу.' },
+  es: { score: 'Afinidad Qloo', scoreInfo: 'Índice de afinidad cultural de Qloo; no es la probabilidad de que te guste.', noScore: 'Afinidad no disponible', schedule: 'Horarios sugeridos: no se han verificado horarios de apertura ni tiempos de viaje.', distance: 'Desde la parada anterior, en línea recta', far: 'Distancia larga entre paradas', maps: 'Buscar en el mapa', demoLocation: 'Idea demo — sin ubicación verificada', missingLocation: 'No se dispone de ubicación en el mapa', approximateLocation: 'Ubicación aproximada; comprueba la dirección.' },
+  zh: { score: 'Qloo 品味关联', scoreInfo: 'Qloo 文化关联指数，并非你喜欢该地点的概率。', noScore: '缺少可核实的关联评分', schedule: '到访时间仅为建议；未核实营业时间及交通用时。', distance: '距上一站直线距离', far: '相邻站点距离较远', maps: '在地图中搜索', demoLocation: '演示创意 — 无已确认位置', missingLocation: '无法提供地图位置', approximateLocation: '根据地理编码推算的大致位置，请核对地址。' },
 };
 
 const surpriseSeeds = [
@@ -848,6 +850,7 @@ export default function Home() {
                       : <div className="address">{item.provenance === 'demo'
                         ? evidenceCopy[locale].demoLocation
                         : evidenceCopy[locale].missingLocation}</div>}
+                    {item.coordinatesApproximate && <div className="address">{evidenceCopy[locale].approximateLocation}</div>}
                     {distanceKm !== undefined && <div className="address">{evidenceCopy[locale].distance}: ≈ {distanceKm.toFixed(1)} km{distanceKm > 5 ? ` · ${evidenceCopy[locale].far}` : ''}</div>}
                     <p>{item.reason || t.matchFallback}</p>
                     {item.bridge && <div className="bridge"><span>{t.tasteBridge}</span>{item.bridge}</div>}

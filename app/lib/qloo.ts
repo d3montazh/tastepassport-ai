@@ -71,7 +71,7 @@ export type QlooStatus =
   'upstream_unavailable' | 'timeout' | 'network_error' | 'no_interest_matches' |
   'no_category_matches' | 'no_results' | 'unexpected_response';
 
-export type QlooResult = { entities: QlooEntity[]; status: QlooStatus };
+export type QlooResult = { entities: QlooEntity[]; status: QlooStatus; resolvedCategoryTags?: number };
 class QlooFailure extends Error {
   constructor(readonly code: QlooStatus) { super('Qloo request not completed'); }
 }
@@ -82,6 +82,8 @@ export async function qlooPlacesWithStatus(options: {
   popularityMax?: number;
   budget?: boolean;
   categories?: string[];
+  /** At least one category alternative must resolve, then Qloo uses tag union. */
+  categoryAlternatives?: string[];
 }): Promise<QlooResult> {
   const key = process.env.QLOO_API_KEY?.trim();
   if (!key || key === 'your_qloo_api_key_here') return { entities: [], status: 'missing_key' };
@@ -149,6 +151,29 @@ export async function qlooPlacesWithStatus(options: {
       // Keep all exact matches instead of trusting the first (possibly empty) taxonomy.
       tags.push(...matches.map((tag: any) => tag.id));
     }
+    // Used only when enriching an incomplete route. Query the tag lookup
+    // API for actual place-tag IDs; never invent tag URNs. Unavailable
+    // alternatives are skipped rather than invalidating the whole search.
+    if (options.categoryAlternatives?.length) {
+      const alternatives = [...new Set(options.categoryAlternatives)].slice(0, 4);
+      const resolved = await Promise.all(alternatives.map(async category => {
+        try {
+          const data = await get('/v2/tags', { 'filter.query': category, take: '50' });
+          const found = data?.results?.tags;
+          return Array.isArray(found) ? found.filter((tag: any) =>
+            typeof tag?.id === 'string' &&
+            /^urn:tag:(genre|category):place:/.test(tag.id) &&
+            String(tag.name).trim().toLowerCase() === category.toLowerCase())
+            .map((tag: any) => tag.id as string) : [];
+        } catch {
+          // Supplemental enrichment failure should not discard valid
+          // baseline recommendations.
+          return [] as string[];
+        }
+      }));
+      tags.push(...resolved.flat());
+      if (!tags.length) return { entities: [], status: 'no_category_matches', resolvedCategoryTags: 0 };
+    }
     const params: Record<string, string> = {
       'filter.type': 'urn:entity:place',
       'filter.location.query': options.city,
@@ -173,7 +198,8 @@ export async function qlooPlacesWithStatus(options: {
       seen.add(id);
       return true;
     });
-    return { entities, status: entities.length ? 'ok' : 'no_results' };
+    return { entities, status: entities.length ? 'ok' : 'no_results',
+      resolvedCategoryTags: [...new Set(tags)].length };
   } catch (error) {
     // Intentionally don't expose upstream bodies, URLs, headers, raw errors or credentials.
     const status: QlooStatus = error instanceof QlooFailure ? error.code

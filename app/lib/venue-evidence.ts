@@ -35,9 +35,51 @@ function point(value: unknown): Coordinate | undefined {
   return { lat, lng };
 }
 
+/** Qloo may supply a precise geohash instead of numeric latitude/longitude.
+ * Decode its cell center, but only for 8-12 character hashes. Short hashes
+ * cover overly broad areas and cannot be safely used as venue pins.
+ */
+export function geohashCenter(value: unknown): Coordinate | undefined {
+  if (typeof value !== 'string' || !/^[0123456789bcdefghjkmnpqrstuvwxyz]{8,12}$/.test(value)) return undefined;
+  const alphabet = '0123456789bcdefghjkmnpqrstuvwxyz';
+  let latMin = -90;
+  let latMax = 90;
+  let lngMin = -180;
+  let lngMax = 180;
+  let even = true;
+  for (const char of value) {
+    const bits = alphabet.indexOf(char);
+    for (let mask = 16; mask > 0; mask >>= 1) {
+      if (even) {
+        const middle = (lngMin + lngMax) / 2;
+        if (bits & mask) lngMin = middle;
+        else lngMax = middle;
+      } else {
+        const middle = (latMin + latMax) / 2;
+        if (bits & mask) latMin = middle;
+        else latMax = middle;
+      }
+      even = !even;
+    }
+  }
+  return { lat: (latMin + latMax) / 2, lng: (lngMin + lngMax) / 2 };
+}
+
+/** Geohash cell centers are approximations, not surveyed venue entrances. */
+export function qlooUsesGeohash(entity: Source): boolean {
+  const p = entity.properties ?? {};
+  if (point(p.location) || point(p.coordinates) || point(p.geocode) || point(p)) return false;
+  const geocode = p.geocode && typeof p.geocode === 'object'
+    ? p.geocode as Record<string, unknown> : {};
+  return Boolean(geohashCenter(geocode.geohash ?? p.geohash));
+}
+
 export function qlooCoordinates(entity: Source): Coordinate | undefined {
   const properties = entity.properties ?? {};
-  return point(properties.location) || point(properties.coordinates) || point(properties.geocode) || point(properties);
+  const geocode = properties.geocode && typeof properties.geocode === 'object'
+    ? properties.geocode as Record<string, unknown> : {};
+  return point(properties.location) || point(properties.coordinates) || point(properties.geocode) ||
+    point(properties) || geohashCenter(geocode.geohash ?? properties.geohash);
 }
 
 /** Straight-line distance, never estimated travel time or road distance. */

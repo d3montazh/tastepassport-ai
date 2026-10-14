@@ -53,3 +53,16 @@ test('reject Qloo place without location evidence and invalid coordinates', () =
     name: 'Unknown', provenance: 'qloo', coordinates: { lat: 100, lng: 2 },
   }, 'Paris'), undefined);
 });
+
+test('geohash-derived cell center is never linked as an exact venue coordinate', () => {
+  const result = mapsLinkForVerifiedSource({
+    provenance:'qloo', name:'Museo Real', address:'123 Museum Street',
+    coordinates:{lat:42.5,lng:-5.5}, coordinatesApproximate:true,
+  },'Madrid');
+  assert.equal(new URL(result).searchParams.get('query'),
+    'Museo Real, 123 Museum Street, Madrid');
+  assert.equal(mapsLinkForVerifiedSource({
+    provenance:'qloo', name:'Unlocated Place',
+    coordinates:{lat:42.5,lng:-5.5}, coordinatesApproximate:true,
+  },'Madrid'),undefined);
+});

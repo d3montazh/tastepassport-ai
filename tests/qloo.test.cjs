@@ -599,3 +599,83 @@ test('when Qloo returns few places, candidate summary explains real-vs-demo cove
   assert.equal(data.meta.audit.qloo, 1);
   assert.equal(data.meta.audit.demo, 5);
 });
+
+
+test('cultural enrichment uses only resolved Qloo place-tag IDs and fills missing roles', async () => {
+  process.env.QLOO_API_KEY = 'test-placeholder';
+  const queries = [];
+  global.fetch = async (url, init) => {
+    assert.equal(init.headers['X-Api-Key'], 'test-placeholder');
+    assert.equal(url.origin, 'https://hackathon.api.qloo.com');
+    queries.push(url);
+    if (url.pathname === '/search') return Response.json({
+      results: [{ entity_id: 'real-cultural-seed' }],
+    });
+    if (url.pathname === '/v2/tags') {
+      const q = url.searchParams.get('filter.query');
+      const tags = {
+        'Museum': { id: 'urn:tag:genre:place:museum', name: 'Museum' },
+        'Art gallery': { id: 'urn:tag:genre:place:art_gallery', name: 'Art gallery' },
+        'Park': { id: 'urn:tag:category:place:park', name: 'Park' },
+      };
+      // Any superficially similar non-place tag must not become a filter.
+      return Response.json({ results: { tags: [
+        { id: 'urn:tag:genre:media:museum', name: 'Museum' },
+        ...(tags[q] ? [tags[q]] : []),
+      ] } });
+    }
+    assert.equal(url.pathname, '/v2/insights');
+    const filtered = url.searchParams.has('filter.tags');
+    return Response.json({ results: { entities: filtered ? [
+      { name: 'Museum from Qloo', subtype: 'Museum',
+        properties: { address: 'Museums Road', geocode: { geohash: 'ezs42e44' } } },
+      { name: 'Art Gallery from Qloo', subtype: 'Art gallery',
+        properties: { address: 'Gallery Street' } },
+      { name: 'Park from Qloo', subtype: 'Park', properties: { address: 'Park Way' } },
+    ] : [
+      { name: 'Shop from Qloo', subtype: 'Clothing store', properties: { address: 'Style Road' } },
+      { name: 'Meal from Qloo', subtype: 'Restaurant', properties: { address: 'Lunch Street' } },
+      { name: 'Night from Qloo', subtype: 'Night club', properties: { address: 'Night Avenue' } },
+    ] } });
+  };
+  const { status, data } = await call('recommend', { locale: 'en' });
+  assert.equal(status, 200);
+  assert.equal(data.meta.fallback, false);
+  assert.equal(data.meta.audit.qloo, 6);
+  assert.equal(data.meta.audit.demo, 0);
+  assert.equal(data.meta.qlooRescue.attempted, true);
+  assert.equal(data.meta.qlooRescue.status, 'ok');
+  assert.equal(data.meta.qlooRescue.resolvedTags, 3);
+  assert.equal(data.meta.qlooRescue.newCandidates, 3);
+  assert.equal(data.meta.qlooCandidateCoverage.returned, 6);
+  assert.equal(data.meta.qlooCandidateCoverage.withValidGeohash, 1);
+  assert.equal(data.items[1].name, 'Shop from Qloo');
+  assert.equal(data.items[2].name, 'Meal from Qloo');
+  assert.equal(data.items[4].name, 'Park from Qloo');
+  const museum = data.items.find(item => item.name === 'Museum from Qloo');
+  assert.equal(museum.coordinatesApproximate, true);
+  assert.ok(museum.coordinates.lat > 42 && museum.coordinates.lat < 43);
+  const enrichment = queries.find(url => url.pathname === '/v2/insights' && url.searchParams.has('filter.tags'));
+  assert.ok(enrichment);
+  assert.equal(enrichment.searchParams.get('operator.filter.tags'), 'union');
+  assert.equal(enrichment.searchParams.get('filter.tags'),
+    'urn:tag:genre:place:museum,urn:tag:genre:place:art_gallery,urn:tag:category:place:park');
+});
+
+test('no place category tags returned does not discard existing Qloo results', async () => {
+  process.env.QLOO_API_KEY = 'test-placeholder';
+  const baseline = liveFetch([], [
+    { name: 'Actual Shop', subtype: 'Clothing store' },
+    { name: 'Actual Restaurant', subtype: 'Restaurant' },
+  ]);
+  global.fetch = async (url, init) =>
+    url.pathname === '/v2/tags'
+      ? Response.json({ results: { tags: [{ id: 'urn:tag:keyword:media:art', name: 'Museum' }] } })
+      : baseline(url, init);
+  const { data } = await call('recommend');
+  assert.equal(data.meta.mixed, true);
+  assert.equal(data.meta.audit.qloo, 2);
+  assert.equal(data.meta.qlooRescue.status, 'no_category_matches');
+  assert.equal(data.meta.qlooRescue.resolvedTags, 0);
+  assert.equal(data.meta.qlooRescue.newCandidates, 0);
+});

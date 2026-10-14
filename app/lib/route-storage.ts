@@ -16,6 +16,7 @@ export type SavedStop = {
   fitSource?: 'qloo-affinity';
   provenance?: 'qloo' | 'demo';
   coordinates?: { lat: number; lng: number };
+  coordinatesApproximate?: boolean;
 };
 export type SavedRoute = {
   version: 1;
@@ -45,6 +46,7 @@ function validStop(value: unknown): value is SavedStop {
     (v.fit === undefined || (typeof v.fit === 'number' && Number.isFinite(v.fit) && v.fit >= 0 && v.fit <= 100)) &&
     (v.fitSource === undefined || v.fitSource === 'qloo-affinity') &&
     (v.provenance === undefined || v.provenance === 'qloo' || v.provenance === 'demo') &&
+    (v.coordinatesApproximate === undefined || typeof v.coordinatesApproximate === 'boolean') &&
     (v.coordinates === undefined ||
       (v.coordinates !== null && typeof v.coordinates === 'object' &&
         typeof (v.coordinates as any).lat === 'number' && typeof (v.coordinates as any).lng === 'number' &&

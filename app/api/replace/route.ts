@@ -2,7 +2,7 @@ import { selectForSlot } from '../../lib/route-quality';
 import { qlooPlaces, unchangedNote, requestError, mixedSource } from '../../lib/qloo';
 import { NextResponse } from 'next/server';
 import { displayPlaceType, summarizeRoute } from '../../lib/route-audit';
-import { qlooAffinityPercent, qlooCoordinates } from '../../lib/venue-evidence';
+import { qlooAffinityPercent, qlooCoordinates, qlooUsesGeohash } from '../../lib/venue-evidence';
 import { normalizeLocale, type Locale } from '../../i18n';
 
 type QlooEntity = {
@@ -149,6 +149,7 @@ export async function POST(request: Request) {
       fit: qlooAffinityPercent(entity),
       fitSource: qlooAffinityPercent(entity) !== undefined ? 'qloo-affinity' : undefined,
       coordinates: qlooCoordinates(entity),
+        coordinatesApproximate: qlooUsesGeohash(entity),
     };
 
     const mixed = Boolean(body?.currentFallback || body?.currentMixed);
