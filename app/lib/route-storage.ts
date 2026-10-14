@@ -38,10 +38,16 @@ function stringOf(value: unknown, max = 1000): value is string {
 function validStop(value: unknown): value is SavedStop {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const v = value as Record<string, unknown>;
+  const strings = ['type', 'time', 'phase', 'bridge', 'address', 'reason'];
   return stringOf(v.name, 300) && v.name.trim().length > 0 &&
-    (!v.time || stringOf(v.time, 30)) &&
-    (!v.address || stringOf(v.address, 600)) &&
-    (!v.reason || stringOf(v.reason, 3000));
+    strings.every(key => v[key] === undefined || v[key] === null || stringOf(v[key], key === 'reason' ? 3000 : 600)) &&
+    (v.fit === undefined || (typeof v.fit === 'number' && Number.isFinite(v.fit) && v.fit >= 0 && v.fit <= 100)) &&
+    (v.fitSource === undefined || v.fitSource === 'qloo-affinity') &&
+    (v.coordinates === undefined ||
+      (v.coordinates !== null && typeof v.coordinates === 'object' &&
+        typeof (v.coordinates as any).lat === 'number' && typeof (v.coordinates as any).lng === 'number' &&
+        Number.isFinite((v.coordinates as any).lat) && Number.isFinite((v.coordinates as any).lng) &&
+        Math.abs((v.coordinates as any).lat) <= 90 && Math.abs((v.coordinates as any).lng) <= 180));
 }
 export function parseSavedRoute(raw: string | null): SavedRoute | null {
   if (!raw || raw.length > 80_000) return null;
@@ -51,7 +57,13 @@ export function parseSavedRoute(raw: string | null): SavedRoute | null {
     const route = v as Record<string, any>;
     if (route.version !== 1 || !stringOf(route.likes, 2000) || !stringOf(route.origin, 250) ||
         !stringOf(route.city, 250) || !['safe', 'balanced', 'unexpected'].includes(route.mode) ||
-        !route.result || !Array.isArray(route.result.items) ||
+        !route.result || typeof route.result !== 'object' ||
+        (route.result.summary !== undefined && !stringOf(route.result.summary, 2000)) ||
+        (route.result.meta !== undefined &&
+          (!route.result.meta || typeof route.result.meta !== 'object' ||
+           (route.result.meta.source !== undefined && !stringOf(route.result.meta.source, 300)) ||
+           (route.result.meta.strategy !== undefined && !stringOf(route.result.meta.strategy, 1500)))) ||
+        !Array.isArray(route.result.items) ||
         route.result.items.length < 1 || route.result.items.length > 6 ||
         !route.result.items.every(validStop)) return null;
     return route as SavedRoute;
