@@ -155,7 +155,7 @@ export async function POST(request: Request) {
         const place = selectForSlot(entities, index, excluded);
         if (!place) continue;
         selected[index] = place;
-        excluded.add(place.name.toLowerCase());
+        excluded.add(place.name!.toLowerCase());
       }
     } else {
       const fullRoute = selectItinerary(entities, currentItems.length);
