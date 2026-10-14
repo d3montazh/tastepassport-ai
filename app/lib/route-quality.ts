@@ -33,6 +33,7 @@ export function placeCategory(entity: PlaceLike): string {
     ...labelOf(p.categories),
     ...labelOf(p.tags),
     ...labelOf(entity.tags),
+    ...labelOf(entity.type),
   ].join(' | ').toLowerCase();
 }
 
@@ -67,10 +68,16 @@ export function selectForSlot<T extends PlaceLike>(
   excludedNames: Iterable<string> = [],
 ): T | undefined {
   const excluded = new Set(Array.from(excludedNames, name => name.trim().toLowerCase()));
-  return candidates.find(place => {
+  const eligible = candidates.filter(place => {
     const name = typeof place.name === 'string' ? place.name.trim().toLowerCase() : '';
     return name.length > 0 && !excluded.has(name) && fitsSlot(place, index);
   });
+  // Prefer a documented matching category to an unclassified venue.
+  // Unknown categories remain a last-resort option, not verified matches.
+  const role = SLOT_ROLES[index];
+  return eligible.find(place => knownCategory(placeCategory(place)) === role)
+    || eligible.find(place => knownCategory(placeCategory(place)) !== undefined)
+    || eligible[0];
 }
 
 /** Assemble an ordered itinerary without using a venue in the wrong role. */
