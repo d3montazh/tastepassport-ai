@@ -5,6 +5,7 @@ import { qlooAffinityPercent, qlooCoordinates } from '../../lib/venue-evidence';
 import { normalizeLocale, type Locale } from '../../i18n';
 
 type QlooEntity = {
+  affinity?: number;
   name?: string;
   title?: string;
   subtype?: string;
