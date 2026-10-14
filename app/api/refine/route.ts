@@ -1,4 +1,4 @@
-import { selectItinerary } from '../../lib/route-quality';
+import { selectForSlot, selectItinerary } from '../../lib/route-quality';
 import { qlooPlaces, unchangedNote, requestError } from '../../lib/qloo';
 import { NextResponse } from 'next/server';
 import { normalizeLocale, type Locale } from '../../i18n';
@@ -137,8 +137,32 @@ export async function POST(request: Request) {
     const supported = intent.lessTouristy || intent.budget || categories.length > 0;
     const entities = supported ? await qlooPlaces({ city, interests, take: 20, categories,
       budget: intent.budget, popularityMax: intent.lessTouristy || mode === 'unexpected' ? 0.65 : undefined }) : [];
-    const selected = selectItinerary(entities, currentItems.length);
-    if (selected.length < currentItems.length) {
+    // A category-constrained Qloo result is not a whole-day itinerary.
+    // For "more fashion"/"more nightlife"/etc, replace only relevant slots.
+    // Other stops retain every field exactly as supplied by the user.
+    const targeted = categories.length > 0;
+    const targetIndices = new Set<number>();
+    if (intent.fashion) targetIndices.add(1);   // shopping
+    if (intent.food) targetIndices.add(2);      // lunch
+    if (intent.music) targetIndices.add(0);     // listening / culture
+    if (intent.art) targetIndices.add(3);       // gallery / cinema
+    if (intent.nightlife) targetIndices.add(5); // night
+    const selected: Array<QlooEntity | undefined> = Array(currentItems.length).fill(undefined);
+    if (targeted) {
+      const excluded = new Set(currentItems.map(item => item.name!.trim().toLowerCase()));
+      for (const index of Array.from(targetIndices).sort((a, b) => a - b)) {
+        if (index >= currentItems.length) continue;
+        const place = selectForSlot(entities, index, excluded);
+        if (!place) continue;
+        selected[index] = place;
+        excluded.add(place.name.toLowerCase());
+      }
+    } else {
+      const fullRoute = selectItinerary(entities, currentItems.length);
+      fullRoute.forEach((place, index) => { selected[index] = place; });
+    }
+    const updatedIndices = selected.flatMap((place, index) => place ? [index] : []);
+    if (!updatedIndices.length || (!targeted && updatedIndices.length !== currentItems.length)) {
       return NextResponse.json({ items: currentItems, meta: {
         changed: false, fallback: true,
         reason: supported ? 'no_matches_or_unavailable' : 'unsupported_instruction',
@@ -148,19 +172,31 @@ export async function POST(request: Request) {
 
     const items = currentItems.map((current, index) => {
       const entity = selected[index];
-      const props = entity?.properties || {};
+      if (!entity) return current;
+      const props = entity.properties || {};
       return {
         ...current,
-        name: entity?.name || current.name || `${copy.discovery} ${index + 1}`,
-        type: entity?.subtype || entity?.type || props?.subtype || current.type || copy.place,
-        address: props?.address || props?.formatted_address || null,
+        name: entity.name,
+        type: entity.subtype || entity.type || props.subtype || current.type || copy.place,
+        address: props.address || props.formatted_address || null,
         reason: copy.liveReason(instruction),
         bridge: `${interests[index % Math.max(interests.length, 1)] || copy.bridgeTaste} + ${instruction} → ${city}`,
         fit: undefined,
       };
     });
-
-    return NextResponse.json({ items, meta: { changed: true, source: 'Qloo Insights API', fallback: false, origin, destination: city, instruction, strategy: copy.liveStrategy(instruction), note: copy.note } });
+    const scopedNotes: Record<Locale, string> = {
+      en: `Updated ${updatedIndices.length} route stop(s) for your request; the rest is unchanged.`,
+      ru: `Обновлено остановок: ${updatedIndices.length}. Остальные точки маршрута сохранены.`,
+      uk: `Оновлено зупинок: ${updatedIndices.length}. Решту маршруту збережено.`,
+      es: `Paradas actualizadas: ${updatedIndices.length}. El resto de la ruta no ha cambiado.`,
+      zh: `已更新 ${updatedIndices.length} 个站点；路线其余部分未变。`,
+    };
+    const note = targeted ? scopedNotes[locale] : copy.note;
+    return NextResponse.json({ items, meta: {
+      changed: true, updatedIndices, source: 'Qloo Insights API', fallback: false,
+      origin, destination: city, instruction,
+      strategy: targeted ? note : copy.liveStrategy(instruction), note,
+    } });
   } catch {
     return NextResponse.json({ error: requestError(errorLocale) }, { status: 400 });
   }
