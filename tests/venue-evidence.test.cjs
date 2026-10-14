@@ -10,7 +10,7 @@ require.extensions['.ts'] = (module, filename) => {
   module._compile(output.outputText, filename);
 };
 
-const { qlooAffinityPercent, qlooCoordinates, aerialDistanceKm } = require('../app/lib/venue-evidence.ts');
+const { qlooAffinityPercent, qlooCoordinates, qlooUsesGeohash, geohashCenter, aerialDistanceKm } = require('../app/lib/venue-evidence.ts');
 
 test('converts only a genuine finite Qloo affinity in [0,1] into a percentage', () => {
   assert.equal(qlooAffinityPercent({ affinity: 0.83 }), 83);
@@ -45,4 +45,24 @@ test('straight-line distances use actual coordinates, not guessed travel times',
   assert.ok(km > 1 && km < 1.2);
   assert.equal(aerialDistanceKm(undefined, ny), undefined);
   assert.equal(aerialDistanceKm({ lat: 100, lng: 0 }, ny), undefined);
+});
+
+test('decode precise venue geohash to its approximate bounding-cell center', () => {
+  // ezs42 is a known geohash near 42.6, -5.6; 8+ chars locate a small cell.
+  const center = geohashCenter('ezs42e44');
+  assert.ok(center.lat > 42 && center.lat < 43);
+  assert.ok(center.lng > -6 && center.lng < -5);
+  assert.deepEqual(qlooCoordinates({ properties: { geocode: { geohash: 'ezs42e44' } } }), center);
+  assert.equal(qlooUsesGeohash({ properties: { geocode: { geohash: 'ezs42e44' } } }), true);
+  assert.equal(qlooUsesGeohash({ properties: { geocode: {
+    geohash: 'ezs42e44', latitude: 42.7, longitude: -5.7
+  } } }), false);
+});
+
+test('reject coarse, malformed or ambiguous geohashes, never invent a point', () => {
+  for (const bad of ['ezs42', 'ezs42e', 'abcdefghijkl', 'EZs42e44', 'ezs42e44extra', {}, 42]) {
+    assert.equal(geohashCenter(bad), undefined);
+  }
+  assert.equal(qlooCoordinates({ properties: { geocode: { geohash: 'ezs42' } } }), undefined);
+  assert.equal(qlooCoordinates({ properties: { geocode: { city: 'Paris' } } }), undefined);
 });
