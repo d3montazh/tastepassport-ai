@@ -53,3 +53,33 @@ test('copy format supports all five languages with no keys or public sharing URL
     assert.ok(!text.includes('QLOO_API_KEY'));
   }
 });
+
+
+test('copied demo stop is explicitly labeled and omits fictional geographic addresses', () => {
+  const mixed = {
+    ...route,
+    result: {
+      ...route.result,
+      items: [
+        { name: 'New York: музична вітальня', address: 'Центр New York',
+          time: '10:00', provenance: 'demo' },
+        { name: 'Real Cafe', address: '123 Example Street',
+          provenance: 'qloo', time: '12:00' },
+      ],
+    },
+  };
+  const shared = routeShareText(mixed, 'uk');
+  assert.match(shared, /ДЕМО-ІДЕЯ/);
+  assert.doesNotMatch(shared, /Центр New York/);
+  assert.match(shared, /123 Example Street/);
+  assert.deepEqual(parseSavedRoute(JSON.stringify(mixed)), mixed);
+});
+
+test('old saved itinerary without source does not claim verified locations', () => {
+  const shared = routeShareText(route, 'ru');
+  assert.match(shared, /Источник места не подтверждён/);
+  assert.doesNotMatch(shared, /Rue A/);
+  assert.equal(parseSavedRoute(JSON.stringify({
+    ...route, result: { ...route.result, items: [{ name: 'Venue', provenance: 'made-up' }] },
+  })), null);
+});
