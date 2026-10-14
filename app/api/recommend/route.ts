@@ -1,3 +1,4 @@
+import { selectItinerary } from '../../lib/route-quality';
 import { qlooPlaces, fallbackSource, requestError } from '../../lib/qloo';
 import { NextResponse } from 'next/server';
 import { normalizeLocale, type Locale } from '../../i18n';
@@ -125,7 +126,7 @@ function reasonFor(entity: QlooEntity, mode: string, locale: Locale) {
   const c = copyFor(locale);
   const explain = entity?.query?.explainability;
   if (explain && typeof explain === 'object') {
-    const names = Object.keys(explain).slice(0, 2);
+    const names = Object.keys(explain).filter(key => !/^(signal\.|filter\.|feature\.|entities|interests|tags|query|entity_id|tag_id)/i.test(key) && !key.includes('.')).slice(0, 2);
     if (names.length) return c.qlooReason(names);
   }
 
@@ -194,7 +195,15 @@ export async function POST(request: Request) {
       });
     }
 
-    const items = entities.slice(0, 6).map((entity, index) => {
+    const selected = selectItinerary(entities, 6);
+    if (!selected.length) {
+      const items = demoItems(city, origin, interests, mode, locale);
+      return NextResponse.json({ summary: c.summary(city, interests), items, meta: {
+        source: fallbackSource(locale), fallback: true, mode, matched: items.length,
+        origin, destination: city, strategy: c.strategy,
+      } });
+    }
+    const items = selected.map((entity, index) => {
       const props = entity?.properties || {};
       return {
         name: entity?.name || `Discovery ${index + 1}`,
@@ -204,7 +213,7 @@ export async function POST(request: Request) {
         time: routeTimes[index],
         phase: c.phases[index],
         bridge: c.liveBridge(interests[index % Math.max(interests.length, 1)] || 'Taste DNA', city),
-        fit: Math.max(68, 94 - index * 5),
+        fit: undefined,
       };
     });
 
