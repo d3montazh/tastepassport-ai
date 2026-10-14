@@ -2,7 +2,7 @@ import { selectPartialItinerary } from '../../lib/route-quality';
 import { qlooPlacesWithStatus, fallbackSource, mixedSource, requestError } from '../../lib/qloo';
 import { NextResponse } from 'next/server';
 import { displayPlaceType, summarizeRoute, summarizeCandidateCoverage } from '../../lib/route-audit';
-import { qlooAffinityPercent, qlooCoordinates } from '../../lib/venue-evidence';
+import { qlooAffinityPercent, qlooCoordinates, qlooUsesGeohash } from '../../lib/venue-evidence';
 import { normalizeLocale, type Locale } from '../../i18n';
 
 type QlooEntity = {
@@ -223,6 +223,7 @@ export async function POST(request: Request) {
         fit: affinity,
         fitSource: affinity !== undefined ? 'qloo-affinity' as const : undefined,
         coordinates: qlooCoordinates(entity),
+        coordinatesApproximate: qlooUsesGeohash(entity),
       };
     });
     const partial = liveCount < items.length;
