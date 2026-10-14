@@ -92,3 +92,27 @@ export function selectItinerary<T extends PlaceLike>(candidates: T[], slots = 6)
   }
   return selected;
 }
+
+/**
+ * Keep every compatible real venue even when Qloo cannot fill all six roles.
+ * A missing role is left undefined so the caller can add an explicitly labelled
+ * demo placeholder. Narrow roles are allocated first to prevent a broad
+ * cultural slot from claiming a candidate needed for food or nightlife.
+ */
+export function selectPartialItinerary<T extends PlaceLike>(
+  candidates: T[], slots = 6,
+): Array<T | undefined> {
+  const selected: Array<T | undefined> = Array(slots).fill(undefined);
+  const used = new Set<string>();
+  // Specialized itinerary roles first, then flexible cultural stops.
+  const priorities = [2, 1, 5, 4, 3, 0];
+  const order = [...priorities.filter(index => index < slots),
+    ...Array.from({ length: slots }, (_, index) => index).filter(index => !priorities.includes(index))];
+  for (const index of order) {
+    const place = selectForSlot(candidates, index, used);
+    if (!place) continue;
+    selected[index] = place;
+    used.add(place.name!.trim().toLowerCase());
+  }
+  return selected;
+}
