@@ -31,6 +31,14 @@ const copy: Record<Locale, { title: string; text: string; badge: string }> = {
   },
 };
 
+const mixedCopy: Record<Locale, { title: string; text: string; badge: string }> = {
+  en: { title: 'Mixed route', text: 'Real Qloo places are preserved; missing stops are demo ideas, not verified venues.', badge: 'Qloo + demo' },
+  ru: { title: 'Смешанный маршрут', text: 'Реальные места Qloo сохранены. Недостающие остановки — демонстрационные идеи, а не проверенные заведения.', badge: 'Qloo + демо' },
+  uk: { title: 'Змішаний маршрут', text: 'Реальні місця Qloo збережено. Решта зупинок — демонстраційні ідеї, не перевірені заклади.', badge: 'Qloo + демо' },
+  es: { title: 'Ruta mixta', text: 'Se conservan los lugares reales de Qloo. Las paradas restantes son ideas demo sin verificar.', badge: 'Qloo + demo' },
+  zh: { title: '混合路线', text: '已保留 Qloo 实际地点；其余为未经核实的演示地点。', badge: 'Qloo + 演示' },
+};
+
 export default function DemoPreview() {
   useEffect(() => {
     const getLocale = () =>
@@ -51,7 +59,8 @@ export default function DemoPreview() {
       }
 
       const locale = getLocale();
-      const current = copy[locale];
+      const isMixed = source.textContent?.trim().startsWith('Qloo +') || false;
+      const current = isMixed ? mixedCopy[locale] : copy[locale];
       const note = existing || document.createElement('div');
 
       if (!existing) {

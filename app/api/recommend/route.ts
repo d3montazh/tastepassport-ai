@@ -1,5 +1,5 @@
-import { selectItinerary } from '../../lib/route-quality';
-import { qlooPlacesWithStatus, fallbackSource, requestError } from '../../lib/qloo';
+import { selectPartialItinerary } from '../../lib/route-quality';
+import { qlooPlacesWithStatus, fallbackSource, mixedSource, requestError } from '../../lib/qloo';
 import { NextResponse } from 'next/server';
 import { displayPlaceType, summarizeRoute } from '../../lib/route-audit';
 import { qlooAffinityPercent, qlooCoordinates } from '../../lib/venue-evidence';
@@ -190,7 +190,7 @@ export async function POST(request: Request) {
           source: fallbackSource(locale),
           fallback: true,
           mode,
-          matched: items.length,
+          matched: 0,
           origin,
           destination: city,
           strategy: c.strategy,
@@ -198,44 +198,46 @@ export async function POST(request: Request) {
       });
     }
 
-    const selected = selectItinerary(entities, 6);
-    if (!selected.length) {
-      const items = demoItems(city, origin, interests, mode, locale);
-      return NextResponse.json({ summary: c.summary(city, interests), items, meta: {
-        audit: summarizeRoute(items),
-        fallbackReason: 'insufficient_compatible_venues',
-        qlooStatus: 'insufficient_compatible_venues',
-        source: fallbackSource(locale), fallback: true, mode, matched: items.length,
-        origin, destination: city, strategy: c.strategy,
-      } });
-    }
+    // Retain all suitable Qloo results, even if the API returns too few
+    // distinct categories for a complete six-stop itinerary.
+    const selected = selectPartialItinerary(entities, 6);
+    const templates = demoItems(city, origin, interests, mode, locale);
+    const liveCount = selected.filter(Boolean).length;
     const items = selected.map((entity, index) => {
-      const props = entity?.properties || {};
+      if (!entity) return templates[index];
+      const props = entity.properties || {};
+      const affinity = qlooAffinityPercent(entity);
       return {
-        name: entity?.name || `Discovery ${index + 1}`,
-        type: displayPlaceType(entity.type, entity.subtype, props, locale === 'ru' ? 'Место' : locale === 'uk' ? 'Місце' : 'Place'),
+        name: entity.name,
+        type: displayPlaceType(entity.type, entity.subtype, props,
+          locale === 'ru' ? 'Место' : locale === 'uk' ? 'Місце' : 'Place'),
         provenance: 'qloo' as const,
         reason: reasonFor(entity, mode, locale),
-        address: props?.address || props?.formatted_address || null,
+        address: props.address || props.formatted_address || null,
         time: routeTimes[index],
         phase: c.phases[index],
         bridge: c.liveBridge(interests[index % Math.max(interests.length, 1)] || 'Taste DNA', city),
-        fit: qlooAffinityPercent(entity),
-        fitSource: qlooAffinityPercent(entity) !== undefined ? 'qloo-affinity' : undefined,
+        fit: affinity,
+        fitSource: affinity !== undefined ? 'qloo-affinity' as const : undefined,
         coordinates: qlooCoordinates(entity),
       };
     });
-
+    const partial = liveCount < items.length;
     return NextResponse.json({
       summary: c.summary(city, interests),
       items,
       meta: {
-        source: 'Qloo Insights API', fallback: false, audit: summarizeRoute(items),
+        source: partial ? mixedSource(locale) : 'Qloo Insights API',
+        fallback: partial,
+        mixed: partial && liveCount > 0,
+        fallbackReason: partial ? 'insufficient_compatible_venues' : undefined,
+        qlooStatus: partial ? 'insufficient_compatible_venues' : 'ok',
+        audit: summarizeRoute(items),
         mode,
-        matched: items.length,
+        matched: liveCount,
         origin,
         destination: city,
-        strategy: c.liveStrategy,
+        strategy: partial ? c.strategy : c.liveStrategy,
       },
     });
   } catch {

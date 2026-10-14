@@ -662,13 +662,15 @@ export default function Home() {
             </div>
             <div className="result-meta">
               <span>{result.meta?.source || 'Qloo Insights API'}</span>
-              <b>{result.meta?.fallback
-                ? (locale === 'ru' ? `${audit.demo} демо-точек`
+              <b>{result.meta?.mixed
+                ? `Qloo: ${audit.qloo} · ${locale === 'ru' ? 'демо' : locale === 'uk' ? 'демо' : locale === 'es' ? 'demo' : locale === 'zh' ? '演示' : 'demo'}: ${audit.demo}`
+                : result.meta?.fallback
+                  ? (locale === 'ru' ? `${audit.demo} демо-точек`
                     : locale === 'uk' ? `${audit.demo} демо-зупинок`
                     : locale === 'es' ? `${audit.demo} paradas de prueba`
                     : locale === 'zh' ? `${audit.demo} 个演示地点`
                     : `${audit.demo} demo stops`)
-                : `${result.meta?.matched ?? result.items?.length ?? 0} ${t.matches}`}</b>
+                  : `${result.meta?.matched ?? result.items?.length ?? 0} ${t.matches}`}</b>
             </div>
           </div>
 
