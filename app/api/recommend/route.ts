@@ -179,7 +179,9 @@ export async function POST(request: Request) {
 
     const { entities, status: qlooStatus } = await qlooPlacesWithStatus({ city, interests, take: 50,
       popularityMax: mode === 'unexpected' ? 0.82 : undefined });
-    const candidateCoverage = summarizeCandidateCoverage(entities);
+    let combinedEntities = entities;
+    let rescueInfo: { attempted: boolean; status: string; resolvedTags: number; newCandidates: number } | undefined;
+    let candidateCoverage = summarizeCandidateCoverage(entities);
     if (!entities.length) {
       const items = demoItems(city, origin, interests, mode, locale);
       return NextResponse.json({
@@ -203,7 +205,32 @@ export async function POST(request: Request) {
 
     // Retain all suitable Qloo results, even if the API returns too few
     // distinct categories for a complete six-stop itinerary.
-    const selected = selectPartialItinerary(entities, 6);
+    let selected = selectPartialItinerary(combinedEntities, 6);
+    const needsCulturalStops = [0, 3, 4].some(index => !selected[index]);
+    if (needsCulturalStops) {
+      // The general affinity ranking can be dominated by restaurants or
+      // nightlife. Make a second *Qloo* query using verified place taxonomy
+      // tags; preserve baseline results if supplementary lookups fail.
+      const rescue = await qlooPlacesWithStatus({
+        city, interests, take: 30,
+        categoryAlternatives: ['Museum', 'Art gallery', 'Park', 'Garden'],
+      });
+      const known = new Set(combinedEntities.map(item => item.name.trim().toLowerCase()));
+      const added = rescue.entities.filter(item => {
+        const name = item.name.trim().toLowerCase();
+        if (known.has(name)) return false;
+        known.add(name);
+        return true;
+      });
+      combinedEntities = [...combinedEntities, ...added];
+      selected = selectPartialItinerary(combinedEntities, 6);
+      candidateCoverage = summarizeCandidateCoverage(combinedEntities);
+      rescueInfo = {
+        attempted: true, status: rescue.status,
+        resolvedTags: rescue.resolvedCategoryTags || 0,
+        newCandidates: added.length,
+      };
+    }
     const templates = demoItems(city, origin, interests, mode, locale);
     const liveCount = selected.filter(Boolean).length;
     const items = selected.map((entity, index) => {
@@ -238,6 +265,7 @@ export async function POST(request: Request) {
         qlooStatus: partial ? 'insufficient_compatible_venues' : 'ok',
         audit: summarizeRoute(items),
         qlooCandidateCoverage: candidateCoverage,
+        qlooRescue: rescueInfo,
         mode,
         matched: liveCount,
         origin,
