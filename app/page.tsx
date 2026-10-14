@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { languages, normalizeLocale, uiCopy, type Locale } from './i18n';
 import { aerialDistanceKm, type Coordinate } from './lib/venue-evidence';
+import { SAVED_ROUTE_KEY, parseSavedRoute, routeShareText, type SavedRoute } from './lib/route-storage';
 
 type Mode = 'safe' | 'balanced' | 'unexpected';
 type ReplacementStyle = 'closer' | 'surprise';
@@ -33,6 +34,17 @@ type ResultPayload = {
     destination?: string;
     strategy?: string;
   };
+};
+
+const routeStorageCopy: Record<Locale, {
+  save: string; restore: string; remove: string; share: string; saved: string;
+  restored: string; removed: string; copied: string; error: string; info: string;
+}> = {
+  en: { save: 'Save route', restore: 'Restore saved route', remove: 'Delete saved route', share: 'Copy route', saved: 'Saved on this device.', restored: 'Saved route restored.', removed: 'Saved route deleted.', copied: 'Route copied. Share it wherever you like.', error: 'Could not access local storage or clipboard.', info: 'Saved only in this browser. Sharing copies text, not a public link.' },
+  ru: { save: 'Сохранить маршрут', restore: 'Вернуть сохранённый', remove: 'Удалить сохранённый', share: 'Скопировать маршрут', saved: 'Маршрут сохранён на этом устройстве.', restored: 'Маршрут восстановлен.', removed: 'Сохранённый маршрут удалён.', copied: 'Маршрут скопирован — можно отправить.', error: 'Не удалось получить доступ к сохранению или буферу обмена.', info: 'Хранится только в этом браузере. Для отправки копируется текст, а не публичная ссылка.' },
+  uk: { save: 'Зберегти маршрут', restore: 'Відновити збережений', remove: 'Видалити збережений', share: 'Скопіювати маршрут', saved: 'Маршрут збережено на цьому пристрої.', restored: 'Маршрут відновлено.', removed: 'Збережений маршрут видалено.', copied: 'Маршрут скопійовано — можна надіслати.', error: 'Не вдалося отримати доступ до сховища або буфера обміну.', info: 'Зберігається лише в цьому браузері. Для надсилання копіюється текст, а не публічне посилання.' },
+  es: { save: 'Guardar ruta', restore: 'Restaurar ruta', remove: 'Eliminar ruta guardada', share: 'Copiar ruta', saved: 'Ruta guardada en este dispositivo.', restored: 'Ruta restaurada.', removed: 'Ruta guardada eliminada.', copied: 'Ruta copiada para compartir.', error: 'No se pudo usar el almacenamiento o el portapapeles.', info: 'Solo se guarda en este navegador. Se copia texto, no un enlace público.' },
+  zh: { save: '保存路线', restore: '恢复路线', remove: '删除已保存路线', share: '复制路线', saved: '路线已保存在此设备。', restored: '已恢复保存的路线。', removed: '已删除保存的路线。', copied: '路线已复制，可发送给他人。', error: '无法访问本地存储或剪贴板。', info: '仅保存在此浏览器。分享功能复制文字，不创建公开链接。' },
 };
 
 const evidenceCopy: Record<Locale, {
@@ -173,8 +185,11 @@ export default function Home() {
   const [agentMessage, setAgentMessage] = useState('');
   const [refineInstruction, setRefineInstruction] = useState(t.presets[0]);
   const [refining, setRefining] = useState(false);
+  const [hasSavedRoute, setHasSavedRoute] = useState(false);
+  const [saveMessage, setSaveMessage] = useState('');
 
   useEffect(() => {
+    try { setHasSavedRoute(Boolean(parseSavedRoute(window.localStorage.getItem(SAVED_ROUTE_KEY)))); } catch { setHasSavedRoute(false); }
     const saved = window.localStorage.getItem('tastepassport-locale');
     const browserLocale = navigator.language || 'en';
     const next = normalizeLocale(saved || browserLocale);
@@ -219,6 +234,54 @@ export default function Home() {
       };
     });
   }, [result, tasteTags, t.discoveryFallback]);
+
+  function snapshot(): SavedRoute | null {
+    if (!result?.items?.length) return null;
+    return { version: 1, likes, origin, city, mode, result: { ...result, items: result.items } };
+  }
+
+  function saveRoute() {
+    const route = snapshot();
+    if (!route) return;
+    try {
+      window.localStorage.setItem(SAVED_ROUTE_KEY, JSON.stringify(route));
+      setHasSavedRoute(true);
+      setSaveMessage(routeStorageCopy[locale].saved);
+    } catch { setSaveMessage(routeStorageCopy[locale].error); }
+  }
+
+  function restoreRoute() {
+    try {
+      const stored = parseSavedRoute(window.localStorage.getItem(SAVED_ROUTE_KEY));
+      if (!stored) { setHasSavedRoute(false); setSaveMessage(routeStorageCopy[locale].error); return; }
+      setLikes(stored.likes);
+      setOrigin(stored.origin);
+      setCity(stored.city);
+      setMode(stored.mode);
+      setResult(stored.result);
+      setAgentMessage('');
+      setError('');
+      setSaveMessage(routeStorageCopy[locale].restored);
+      requestAnimationFrame(() => document.getElementById('results')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    } catch { setSaveMessage(routeStorageCopy[locale].error); }
+  }
+
+  function deleteSavedRoute() {
+    try {
+      window.localStorage.removeItem(SAVED_ROUTE_KEY);
+      setHasSavedRoute(false);
+      setSaveMessage(routeStorageCopy[locale].removed);
+    } catch { setSaveMessage(routeStorageCopy[locale].error); }
+  }
+
+  async function copyRoute() {
+    const route = snapshot();
+    if (!route) return;
+    try {
+      await navigator.clipboard.writeText(routeShareText(route, locale));
+      setSaveMessage(routeStorageCopy[locale].copied);
+    } catch { setSaveMessage(routeStorageCopy[locale].error); }
+  }
 
   function changeLanguage(nextLocale: Locale) {
     setLocale(nextLocale);
@@ -463,6 +526,7 @@ export default function Home() {
             <span className="section-kicker">{t.buildKicker}</span>
             <h2>{t.buildTitle}</h2>
           </div>
+            {hasSavedRoute && <button className="ghost-button" type="button" onClick={restoreRoute}>{routeStorageCopy[locale].restore}</button>}
           <button className="ghost-button" onClick={surpriseMe} type="button">
             ✦ {t.surpriseMe}
           </button>
@@ -576,6 +640,14 @@ export default function Home() {
               <b>{result.meta?.matched ?? result.items?.length ?? 0} {t.matches}</b>
             </div>
           </div>
+
+          <div className="route-utility-actions">
+            <button type="button" onClick={saveRoute}>{routeStorageCopy[locale].save}</button>
+            <button type="button" onClick={copyRoute}>{routeStorageCopy[locale].share}</button>
+            {hasSavedRoute && <button type="button" onClick={restoreRoute}>{routeStorageCopy[locale].restore}</button>}
+            {hasSavedRoute && <button type="button" onClick={deleteSavedRoute}>{routeStorageCopy[locale].remove}</button>}
+          </div>
+          <div className="route-storage-info" role="status">{saveMessage || routeStorageCopy[locale].info}</div>
 
           <div className="translation-map">
             <div className="translation-city">
