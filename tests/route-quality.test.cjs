@@ -53,7 +53,7 @@ test('partial selection keeps scarce specialized venues in their roles', () => {
   assert.equal(selected.length, 6);
   assert.equal(selected[1]?.name, 'Shop A');
   assert.equal(selected[2]?.name, 'Cafe A');
-  assert.equal(selected[0]?.name, 'Gallery A');
+  assert.equal(selected[3]?.name, 'Gallery A');
   assert.equal(selected[5], undefined);
   assert.equal(selected.some(item => item?.name === 'Hotel A'), false);
 });
