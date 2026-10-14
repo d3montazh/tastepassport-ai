@@ -16,6 +16,7 @@ type RouteItem = {
 };
 
 type QlooEntity = {
+  affinity?: number;
   name?: string;
   title?: string;
   subtype?: string;
