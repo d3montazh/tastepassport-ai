@@ -1,3 +1,4 @@
+import { selectForSlot } from '../../lib/route-quality';
 import { qlooPlaces, unchangedNote, requestError } from '../../lib/qloo';
 import { NextResponse } from 'next/server';
 import { normalizeLocale, type Locale } from '../../i18n';
@@ -125,7 +126,7 @@ export async function POST(request: Request) {
     const entities = await qlooPlaces({ city, interests, take: 16,
       popularityMax: replacementStyle === 'surprise' || mode === 'unexpected' ? 0.72 : undefined });
     const excluded = new Set([...currentNames, String(currentItem.name || '').toLowerCase()]);
-    const entity = entities.find((candidate) => !excluded.has(candidate.name.toLowerCase()));
+    const entity = selectForSlot(entities, index, excluded);
     if (!entity) {
       return NextResponse.json({ item: currentItem, meta: {
         changed: false, fallback: true, reason: 'no_matches_or_unavailable', note: unchangedNote(locale),
@@ -141,7 +142,7 @@ export async function POST(request: Request) {
       phase: currentItem.phase,
       reason: replacementStyle === 'surprise' ? copy.liveSurprise : copy.liveCloser,
       bridge: `${interests[index % Math.max(interests.length, 1)] || 'Taste DNA'} → ${city} ${copy.bridge}`,
-      fit: replacementStyle === 'surprise' ? 78 : 91,
+      fit: undefined,
     };
 
     return NextResponse.json({ item, meta: { changed: true, source: 'Qloo Insights API', fallback: false, action: replacementStyle, origin, destination: city, note: replacementStyle === 'surprise' ? copy.noteSurprise : copy.noteCloser } });
