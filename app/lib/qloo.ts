@@ -22,6 +22,17 @@ export function fallbackSource(locale: Locale): string {
   return labels[locale] || labels.en;
 }
 
+export function mixedSource(locale: Locale): string {
+  const labels: Record<Locale, string> = {
+    en: 'Qloo + demo preview (some stops are not verified)',
+    ru: 'Qloo + демо (часть остановок не проверена)',
+    uk: 'Qloo + демо (частину зупинок не перевірено)',
+    es: 'Qloo + demostración (algunas paradas sin verificar)',
+    zh: 'Qloo + 演示（部分地点未经验证）',
+  };
+  return labels[locale];
+}
+
 export function requestError(locale: Locale): string {
   const labels: Record<string, string> = {
     en: 'Invalid request. Check the required fields.',

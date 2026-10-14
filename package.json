@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "node --test tests/qloo.test.cjs"
+    "test": "node --test tests/*.test.cjs"
   },
   "dependencies": {
     "next": "^15.5.0",

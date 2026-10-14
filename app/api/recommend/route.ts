@@ -1,3 +1,4 @@
+import { selectItinerary } from '../../lib/route-quality';
 import { qlooPlaces, fallbackSource, requestError } from '../../lib/qloo';
 import { NextResponse } from 'next/server';
 import { normalizeLocale, type Locale } from '../../i18n';
@@ -121,14 +122,10 @@ function copyFor(locale: Locale): any {
   };
 }
 
-function reasonFor(entity: QlooEntity, mode: string, locale: Locale) {
+function reasonFor(_entity: QlooEntity, mode: string, locale: Locale) {
   const c = copyFor(locale);
-  const explain = entity?.query?.explainability;
-  if (explain && typeof explain === 'object') {
-    const names = Object.keys(explain).slice(0, 2);
-    if (names.length) return c.qlooReason(names);
-  }
-
+  // Qloo's raw explainability object is not a set of verified user interests.
+  // Use safe, localized copy until specific evidence fields are mapped.
   if (mode === 'unexpected') return c.unexpectedReason;
   if (mode === 'safe') return c.safeReason;
   return c.balancedReason;
@@ -147,7 +144,7 @@ function demoItems(city: string, origin: string, interests: string[], mode: stri
     reason: template.reason(signals[index], mode, city, origin),
     address: template.address(city),
     bridge: template.bridge(signals[index], mode, city, origin),
-    fit: index === 0 ? 94 : index === 1 ? 89 : index === 2 ? 86 : index === 3 ? 82 : index === 4 ? 79 : mode === 'unexpected' ? 74 : 84,
+    fit: undefined,
     time: routeTimes[index],
     phase: c.phases[index],
   }));
@@ -175,7 +172,7 @@ export async function POST(request: Request) {
       .slice(0, 8);
     const c = copyFor(locale);
 
-    const entities = await qlooPlaces({ city, interests, take: 8,
+    const entities = await qlooPlaces({ city, interests, take: 24,
       popularityMax: mode === 'unexpected' ? 0.82 : undefined });
     if (!entities.length) {
       const items = demoItems(city, origin, interests, mode, locale);
@@ -194,7 +191,15 @@ export async function POST(request: Request) {
       });
     }
 
-    const items = entities.slice(0, 6).map((entity, index) => {
+    const selected = selectItinerary(entities, 6);
+    if (!selected.length) {
+      const items = demoItems(city, origin, interests, mode, locale);
+      return NextResponse.json({ summary: c.summary(city, interests), items, meta: {
+        source: fallbackSource(locale), fallback: true, mode, matched: items.length,
+        origin, destination: city, strategy: c.strategy,
+      } });
+    }
+    const items = selected.map((entity, index) => {
       const props = entity?.properties || {};
       return {
         name: entity?.name || `Discovery ${index + 1}`,
@@ -204,7 +209,7 @@ export async function POST(request: Request) {
         time: routeTimes[index],
         phase: c.phases[index],
         bridge: c.liveBridge(interests[index % Math.max(interests.length, 1)] || 'Taste DNA', city),
-        fit: Math.max(68, 94 - index * 5),
+        fit: undefined,
       };
     });
 

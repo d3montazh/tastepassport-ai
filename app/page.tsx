@@ -22,6 +22,8 @@ type ResultPayload = {
   items?: ResultItem[];
   meta?: {
     source?: string;
+    fallback?: boolean;
+    mixed?: boolean;
     mode?: string;
     matched?: number;
     origin?: string;
@@ -191,7 +193,7 @@ export default function Home() {
         signal: bridgeSignal || signals[index % signals.length],
         target: item.name,
         type: item.type || t.discoveryFallback,
-        fit: item.fit ?? Math.max(62, 92 - index * 5),
+        fit: item.fit,
       };
     });
   }, [result, tasteTags, t.discoveryFallback]);
@@ -283,6 +285,8 @@ export default function Home() {
           replacementStyle,
           currentItem: result.items[index],
           currentNames: result.items.map((item) => item.name),
+          currentFallback: result.meta?.fallback,
+          currentMixed: result.meta?.mixed,
         }),
       });
       const data = await res.json();
@@ -301,7 +305,9 @@ export default function Home() {
           items: nextItems,
           meta: {
             ...current.meta,
-            source: data?.meta?.fallback ? data.meta.source : current.meta?.source,
+            source: data?.meta?.source || current.meta?.source,
+            fallback: data?.meta?.fallback ?? current.meta?.fallback,
+            mixed: data?.meta?.mixed ?? current.meta?.mixed,
             strategy: replacementStyle === 'surprise' ? t.strategySurprise : t.strategyCloser,
           },
         };
@@ -337,6 +343,8 @@ export default function Home() {
           locale,
           instruction: refineInstruction.trim(),
           currentItems: result.items,
+          currentFallback: result.meta?.fallback,
+          currentMixed: result.meta?.mixed,
         }),
       });
       const data = await res.json();
@@ -355,6 +363,8 @@ export default function Home() {
           meta: {
             ...current.meta,
             source: data?.meta?.source || current.meta?.source,
+            fallback: data?.meta?.fallback ?? current.meta?.fallback,
+            mixed: data?.meta?.mixed ?? current.meta?.mixed,
             strategy: data?.meta?.strategy || `${t.fullAdapted} “${refineInstruction.trim()}”`,
           },
         };
@@ -639,10 +649,7 @@ export default function Home() {
                       <strong>{link.signal}</strong>
                     </div>
                     <div className="taste-map-connection">
-                      <div className="taste-map-line">
-                        <i style={{ left: `${Math.min(91, Math.max(9, link.fit))}%` }} />
-                      </div>
-                      <b>{link.fit}%</b>
+                      <div className="taste-map-line" />
                     </div>
                     <div className="taste-map-node taste-map-target">
                       <small>{link.type}</small>
@@ -674,11 +681,13 @@ export default function Home() {
                     {item.address && <div className="address">⌖ {item.address}</div>}
                     <p>{item.reason || t.matchFallback}</p>
                     {item.bridge && <div className="bridge"><span>{t.tasteBridge}</span>{item.bridge}</div>}
-                    <div className="match-row">
-                      <span>{t.routeFit}</span>
-                      <div className="match-bar"><i style={{ width: `${item.fit ?? Math.max(62, 92 - i * 5)}%` }} /></div>
-                      <b>{item.fit ?? Math.max(62, 92 - i * 5)}%</b>
-                    </div>
+                    {typeof item.fit === 'number' && Number.isFinite(item.fit) && (
+                      <div className="match-row">
+                        <span>{t.routeFit}</span>
+                        <div className="match-bar"><i style={{ width: `${Math.min(100, Math.max(0, item.fit))}%` }} /></div>
+                        <b>{item.fit}%</b>
+                      </div>
+                    )}
 
                     <div className="agent-actions">
                       <span>{t.adaptStop}</span>
