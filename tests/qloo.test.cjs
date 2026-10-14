@@ -564,3 +564,13 @@ test('incompatible hotels are never used as live food or nightlife venues', asyn
   assert.equal(data.meta.audit.qloo, 1);
   assert.equal(data.meta.audit.demo, 5);
 });
+
+
+test('demo templates do not claim fictional district names as verified addresses', async () => {
+  delete process.env.QLOO_API_KEY;
+  global.fetch = () => { throw new Error('Qloo should not be called'); };
+  const { data } = await call('recommend', { locale: 'uk', city: 'New York' });
+  assert.equal(data.meta.fallback, true);
+  assert.equal(data.items[0].provenance, 'demo');
+  assert.ok(data.items.every(item => item.address === null));
+});
