@@ -251,7 +251,7 @@ test('live recommend rejects a hotel in a meal slot instead of presenting an inv
   process.env.QLOO_API_KEY = 'test-placeholder';
   const entities = Array.from({ length: 8 }, (_, i) => ({
     entity_id: `venue-${i}`, name: `Venue ${i}`,
-    subtype: i === 2 ? 'Hotel' : undefined,
+    subtype: i >= 2 ? 'Hotel' : undefined,
     properties: { address: `Street ${i}` },
   }));
   global.fetch = liveFetch([], entities);
