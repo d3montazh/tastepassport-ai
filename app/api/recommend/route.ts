@@ -146,7 +146,8 @@ function demoItems(city: string, origin: string, interests: string[], mode: stri
     type: template.type,
     provenance: 'demo' as const,
     reason: template.reason(signals[index], mode, city, origin),
-    address: template.address(city),
+    // Demo templates describe concepts, not geocoded addresses.
+    address: null,
     bridge: template.bridge(signals[index], mode, city, origin),
     fit: undefined,
     time: routeTimes[index],
