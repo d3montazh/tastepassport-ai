@@ -122,14 +122,10 @@ function copyFor(locale: Locale): any {
   };
 }
 
-function reasonFor(entity: QlooEntity, mode: string, locale: Locale) {
+function reasonFor(_entity: QlooEntity, mode: string, locale: Locale) {
   const c = copyFor(locale);
-  const explain = entity?.query?.explainability;
-  if (explain && typeof explain === 'object') {
-    const names = Object.keys(explain).filter(key => !/^(signal\.|filter\.|feature\.|entities|interests|tags|query|entity_id|tag_id)/i.test(key) && !key.includes('.')).slice(0, 2);
-    if (names.length) return c.qlooReason(names);
-  }
-
+  // Qloo's raw explainability object is not a set of verified user interests.
+  // Use safe, localized copy until specific evidence fields are mapped.
   if (mode === 'unexpected') return c.unexpectedReason;
   if (mode === 'safe') return c.safeReason;
   return c.balancedReason;
