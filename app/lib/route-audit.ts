@@ -5,7 +5,7 @@
 import type { Coordinate } from './venue-evidence';
 
 export type AuditableStop = {
-  name: string;
+  name?: string;
   provenance?: 'qloo' | 'demo';
   fit?: number;
   fitSource?: string;
