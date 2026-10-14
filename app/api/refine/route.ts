@@ -1,5 +1,5 @@
 import { selectForSlot, selectItinerary } from '../../lib/route-quality';
-import { qlooPlaces, unchangedNote, requestError } from '../../lib/qloo';
+import { qlooPlaces, unchangedNote, requestError, mixedSource } from '../../lib/qloo';
 import { NextResponse } from 'next/server';
 import { normalizeLocale, type Locale } from '../../i18n';
 
@@ -192,8 +192,11 @@ export async function POST(request: Request) {
       zh: `已更新 ${updatedIndices.length} 个站点；路线其余部分未变。`,
     };
     const note = targeted ? scopedNotes[locale] : copy.note;
+    // Retained demo stops must not be presented as a fully live route.
+    const mixed = Boolean(body?.currentFallback || body?.currentMixed) && updatedIndices.length < currentItems.length;
     return NextResponse.json({ items, meta: {
-      changed: true, updatedIndices, source: 'Qloo Insights API', fallback: false,
+      changed: true, updatedIndices,
+      source: mixed ? mixedSource(locale) : 'Qloo Insights API', fallback: mixed, mixed,
       origin, destination: city, instruction,
       strategy: targeted ? note : copy.liveStrategy(instruction), note,
     } });
