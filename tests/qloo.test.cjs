@@ -348,3 +348,27 @@ test('Qloo internal explainability keys never appear in recommendation reasons',
   assert.ok(data.items.every(item => !item.reason.includes('signal.interests.entities')));
   assert.ok(data.items.every(item => !item.reason.includes('arbitrary_internal_key')));
 });
+
+
+test('demo routes keep a mixed-source label after one Qloo replacement', async () => {
+  process.env.QLOO_API_KEY = 'test-placeholder';
+  global.fetch = liveFetch([]);
+  const { data } = await call('replace', { locale: 'ru', currentFallback: true });
+  assert.equal(data.meta.changed, true);
+  assert.equal(data.meta.mixed, true);
+  assert.equal(data.meta.fallback, true);
+  assert.match(data.meta.source, /демо/i);
+});
+
+test('category refinement preserves demo provenance for unchanged stops', async () => {
+  process.env.QLOO_API_KEY = 'test-placeholder';
+  global.fetch = liveFetch([]);
+  const { data } = await call('refine', {
+    locale: 'uk', instruction: 'Cheaper restaurants', currentFallback: true,
+  });
+  assert.equal(data.meta.changed, true);
+  assert.deepEqual(data.meta.updatedIndices, [2]);
+  assert.equal(data.meta.mixed, true);
+  assert.match(data.meta.source, /демо/i);
+  assert.equal(data.items[0].name, currentItems[0].name);
+});
