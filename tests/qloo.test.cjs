@@ -574,3 +574,28 @@ test('demo templates do not claim fictional district names as verified addresses
   assert.equal(data.items[0].provenance, 'demo');
   assert.ok(data.items.every(item => item.address === null));
 });
+
+test('recommend asks Qloo for the documented maximum of fifty candidates', async () => {
+  process.env.QLOO_API_KEY = 'test-placeholder';
+  const calls = [];
+  global.fetch = liveFetch(calls);
+  const { data } = await call('recommend', { locale: 'en' });
+  const insights = calls.find(url => url.pathname === '/v2/insights');
+  assert.equal(insights.searchParams.get('take'), '50');
+  assert.equal(data.meta.qlooCandidateCoverage.returned, 8);
+  assert.deepEqual(data.meta.qlooCandidateCoverage.compatiblePerSlot, [8, 8, 8, 8, 8, 8]);
+  assert.equal(data.meta.qlooCandidateCoverage.withAddress, 8);
+});
+
+test('when Qloo returns few places, candidate summary explains real-vs-demo coverage', async () => {
+  process.env.QLOO_API_KEY = 'test-placeholder';
+  global.fetch = liveFetch([], [
+    { name: 'Real Cafe', subtype: 'Restaurant', properties: { address: 'Street' } },
+    { name: 'Real Hotel', subtype: 'Hotel', properties: { geocode: { city: 'Paris' } } },
+  ]);
+  const { data } = await call('recommend');
+  assert.equal(data.meta.qlooCandidateCoverage.returned, 2);
+  assert.deepEqual(data.meta.qlooCandidateCoverage.compatiblePerSlot, [0, 0, 1, 0, 0, 0]);
+  assert.equal(data.meta.audit.qloo, 1);
+  assert.equal(data.meta.audit.demo, 5);
+});

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { languages, normalizeLocale, uiCopy, type Locale } from './i18n';
 import { aerialDistanceKm, type Coordinate } from './lib/venue-evidence';
 import { SAVED_ROUTE_KEY, parseSavedRoute, routeShareText, type SavedRoute } from './lib/route-storage';
-import { summarizeRoute } from './lib/route-audit';
+import { summarizeRoute, type CandidateCoverage } from './lib/route-audit';
 import RouteMap from './components/route-map';
 import { qlooStatusMessage } from './lib/qloo-status-copy';
 import { mapsLinkForVerifiedSource } from './lib/map-links';
@@ -41,19 +41,20 @@ type ResultPayload = {
     strategy?: string;
     fallbackReason?: 'qloo_unavailable_or_no_results' | 'insufficient_compatible_venues';
     qlooStatus?: QlooStatus | 'insufficient_compatible_venues';
+    qlooCandidateCoverage?: CandidateCoverage;
   };
 };
 
 const qualityCopy: Record<Locale, {
-  title: string; qloo: string; demo: string; unknown: string;
+  title: string; qloo: string; demo: string; unknown: string; candidates: string;
   scores: string; coords: string; mapOpen: string; mapClose: string;
   mapPrompt: string; noMap: string; disclaimer: string;
 }> = {
-  en: { title: 'Route evidence', qloo: 'Qloo places', demo: 'Demo stops', unknown: 'Unknown origin', scores: 'With affinity', coords: 'With coordinates', mapOpen: 'Show OpenStreetMap', mapClose: 'Hide map', mapPrompt: 'Open the map only if you want to load third-party OpenStreetMap tiles. This sends viewport data to the tile service. Roads are shown only if routing is configured.', noMap: 'At least two geocoded stops are needed for the map.', disclaimer: 'Coverage describes data availability, not recommendation quality.' },
-  ru: { title: 'Данные о маршруте', qloo: 'Точки Qloo', demo: 'Демо-точки', unknown: 'Источник неизвестен', scores: 'С оценкой Qloo', coords: 'С координатами', mapOpen: 'Показать OpenStreetMap', mapClose: 'Скрыть карту', mapPrompt: 'Карта загружается только по нажатию. При этом OpenStreetMap получает данные о просматриваемой области. Маршрут по дорогам появится только после подключения сервиса.', noMap: 'Для карты нужны координаты хотя бы двух точек.', disclaimer: 'Показатели отражают полноту данных, а не качество рекомендаций.' },
-  uk: { title: 'Дані про маршрут', qloo: 'Точки Qloo', demo: 'Демо-зупинки', unknown: 'Джерело невідоме', scores: 'З оцінкою Qloo', coords: 'З координатами', mapOpen: 'Показати OpenStreetMap', mapClose: 'Сховати карту', mapPrompt: 'Карта завантажується лише після натискання. OpenStreetMap отримає дані про область перегляду. Маршрут дорогами буде доступний лише після підключення сервісу.', noMap: 'Для карти потрібні координати принаймні двох зупинок.', disclaimer: 'Показники відображають наявність даних, а не якість рекомендацій.' },
-  es: { title: 'Datos de la ruta', qloo: 'Lugares Qloo', demo: 'Paradas demo', unknown: 'Fuente desconocida', scores: 'Con afinidad', coords: 'Con coordenadas', mapOpen: 'Mostrar OpenStreetMap', mapClose: 'Ocultar mapa', mapPrompt: 'El mapa se carga solo al pulsar. OpenStreetMap recibirá información de la zona visible. Las rutas por carretera requieren un servidor configurado.', noMap: 'Se necesitan al menos dos lugares con coordenadas.', disclaimer: 'Los indicadores muestran disponibilidad de datos, no calidad de las recomendaciones.' },
-  zh: { title: '路线数据', qloo: 'Qloo 地点', demo: '演示地点', unknown: '来源未知', scores: '有偏好评分', coords: '有坐标', mapOpen: '显示 OpenStreetMap', mapClose: '隐藏地图', mapPrompt: '地图只会在点击后加载。OpenStreetMap 会收到当前地图区域信息。道路导航需另行配置服务。', noMap: '地图至少需要两个具有坐标的地点。', disclaimer: '这些数值反映数据完整度，并非推荐质量。' },
+  en: { title: 'Route evidence', qloo: 'Qloo places', candidates: 'Qloo candidates', demo: 'Demo stops', unknown: 'Unknown origin', scores: 'With affinity', coords: 'With coordinates', mapOpen: 'Show OpenStreetMap', mapClose: 'Hide map', mapPrompt: 'Open the map only if you want to load third-party OpenStreetMap tiles. This sends viewport data to the tile service. Roads are shown only if routing is configured.', noMap: 'At least two geocoded stops are needed for the map.', disclaimer: 'Coverage describes data availability, not recommendation quality.' },
+  ru: { title: 'Данные о маршруте', qloo: 'Точки Qloo', candidates: 'Кандидатов Qloo', demo: 'Демо-точки', unknown: 'Источник неизвестен', scores: 'С оценкой Qloo', coords: 'С координатами', mapOpen: 'Показать OpenStreetMap', mapClose: 'Скрыть карту', mapPrompt: 'Карта загружается только по нажатию. При этом OpenStreetMap получает данные о просматриваемой области. Маршрут по дорогам появится только после подключения сервиса.', noMap: 'Для карты нужны координаты хотя бы двух точек.', disclaimer: 'Показатели отражают полноту данных, а не качество рекомендаций.' },
+  uk: { title: 'Дані про маршрут', qloo: 'Точки Qloo', candidates: 'Кандидатів Qloo', demo: 'Демо-зупинки', unknown: 'Джерело невідоме', scores: 'З оцінкою Qloo', coords: 'З координатами', mapOpen: 'Показати OpenStreetMap', mapClose: 'Сховати карту', mapPrompt: 'Карта завантажується лише після натискання. OpenStreetMap отримає дані про область перегляду. Маршрут дорогами буде доступний лише після підключення сервісу.', noMap: 'Для карти потрібні координати принаймні двох зупинок.', disclaimer: 'Показники відображають наявність даних, а не якість рекомендацій.' },
+  es: { title: 'Datos de la ruta', qloo: 'Lugares Qloo', candidates: 'Candidatos Qloo', demo: 'Paradas demo', unknown: 'Fuente desconocida', scores: 'Con afinidad', coords: 'Con coordenadas', mapOpen: 'Mostrar OpenStreetMap', mapClose: 'Ocultar mapa', mapPrompt: 'El mapa se carga solo al pulsar. OpenStreetMap recibirá información de la zona visible. Las rutas por carretera requieren un servidor configurado.', noMap: 'Se necesitan al menos dos lugares con coordenadas.', disclaimer: 'Los indicadores muestran disponibilidad de datos, no calidad de las recomendaciones.' },
+  zh: { title: '路线数据', qloo: 'Qloo 地点', candidates: 'Qloo 候选地点', demo: '演示地点', unknown: '来源未知', scores: '有偏好评分', coords: '有坐标', mapOpen: '显示 OpenStreetMap', mapClose: '隐藏地图', mapPrompt: '地图只会在点击后加载。OpenStreetMap 会收到当前地图区域信息。道路导航需另行配置服务。', noMap: '地图至少需要两个具有坐标的地点。', disclaimer: '这些数值反映数据完整度，并非推荐质量。' },
 };
 
 const routeStorageCopy: Record<Locale, {
@@ -679,6 +680,7 @@ export default function Home() {
             <h3>{qualityCopy[locale].title}</h3>
             <div className="tp-quality-metrics">
               <span>{qualityCopy[locale].qloo}: <b>{audit.qloo}/{audit.total}</b></span>
+              {result.meta?.qlooCandidateCoverage && <span>{qualityCopy[locale].candidates}: <b>{result.meta.qlooCandidateCoverage.returned}</b></span>}
               <span>{qualityCopy[locale].demo}: <b>{audit.demo}/{audit.total}</b></span>
               {audit.unknown > 0 && <span>{qualityCopy[locale].unknown}: <b>{audit.unknown}</b></span>}
               <span>{qualityCopy[locale].scores}: <b>{audit.withAffinity}/{audit.total}</b></span>

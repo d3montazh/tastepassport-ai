@@ -8,7 +8,7 @@ require.extensions['.ts'] = (module, file) => {
   });
   module._compile(output.outputText, file);
 };
-const { summarizeRoute, displayPlaceType } = require('../app/lib/route-audit.ts');
+const { summarizeRoute, displayPlaceType, summarizeCandidateCoverage } = require('../app/lib/route-audit.ts');
 
 test('audit counts Qloo, demo, unknown and actual structured evidence', () => {
   const result = summarizeRoute([
@@ -35,4 +35,20 @@ test('technical entity urn is not a human readable category', () => {
   assert.equal(displayPlaceType('urn:entity:place', undefined, {}, 'Місце'), 'Місце');
   assert.equal(displayPlaceType('urn:entity:place', 'Clothing store', {}, 'Місце'), 'Clothing store');
   assert.equal(displayPlaceType('urn:entity:place', null, { category: { name: 'Art gallery' } }, 'Place'), 'Art gallery');
+});
+
+test('candidate coverage is a numeric-only summary of all Qloo results', () => {
+  const stats = summarizeCandidateCoverage([
+    { name: 'Cafe', subtype: 'Restaurant', properties: { geocode: { city: 'Paris' }, address: 'Private street' } },
+    { name: 'Hotel', subtype: 'Hotel', properties: { location: { latitude: 48.85, longitude: 2.35 } } },
+    { name: 'Mystery', properties: { geometry: { type: 'Point', coordinates: [2.3, 48.8] } } },
+  ]);
+  assert.deepEqual(stats, {
+    returned: 3, compatiblePerSlot: [1, 1, 2, 1, 1, 1],
+    withParsedCoordinates: 1, withAddress: 1, withGeocodeField: 1,
+    withLocationField: 1, withCoordinatesField: 0,
+    withGeometryField: 1, withRootGeometry: 0,
+  });
+  assert.ok(!JSON.stringify(stats).includes('Private street'));
+  assert.ok(!JSON.stringify(stats).includes('Mystery'));
 });

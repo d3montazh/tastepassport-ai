@@ -1,7 +1,7 @@
 import { selectPartialItinerary } from '../../lib/route-quality';
 import { qlooPlacesWithStatus, fallbackSource, mixedSource, requestError } from '../../lib/qloo';
 import { NextResponse } from 'next/server';
-import { displayPlaceType, summarizeRoute } from '../../lib/route-audit';
+import { displayPlaceType, summarizeRoute, summarizeCandidateCoverage } from '../../lib/route-audit';
 import { qlooAffinityPercent, qlooCoordinates } from '../../lib/venue-evidence';
 import { normalizeLocale, type Locale } from '../../i18n';
 
@@ -177,8 +177,9 @@ export async function POST(request: Request) {
       .slice(0, 8);
     const c = copyFor(locale);
 
-    const { entities, status: qlooStatus } = await qlooPlacesWithStatus({ city, interests, take: 24,
+    const { entities, status: qlooStatus } = await qlooPlacesWithStatus({ city, interests, take: 50,
       popularityMax: mode === 'unexpected' ? 0.82 : undefined });
+    const candidateCoverage = summarizeCandidateCoverage(entities);
     if (!entities.length) {
       const items = demoItems(city, origin, interests, mode, locale);
       return NextResponse.json({
@@ -186,6 +187,7 @@ export async function POST(request: Request) {
         items,
         meta: {
           audit: summarizeRoute(items),
+          qlooCandidateCoverage: candidateCoverage,
           fallbackReason: 'qloo_unavailable_or_no_results',
           qlooStatus,
           source: fallbackSource(locale),
@@ -234,6 +236,7 @@ export async function POST(request: Request) {
         fallbackReason: partial ? 'insufficient_compatible_venues' : undefined,
         qlooStatus: partial ? 'insufficient_compatible_venues' : 'ok',
         audit: summarizeRoute(items),
+        qlooCandidateCoverage: candidateCoverage,
         mode,
         matched: liveCount,
         origin,

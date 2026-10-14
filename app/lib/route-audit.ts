@@ -2,7 +2,8 @@
  * Honest, aggregate diagnostics. This never exports personal input, entity
  * identifiers, secret keys or raw Qloo explainability payloads.
  */
-import type { Coordinate } from './venue-evidence';
+import { qlooCoordinates, type Coordinate } from './venue-evidence';
+import { fitsSlot, type PlaceLike } from './route-quality';
 
 export type AuditableStop = {
   name?: string;
@@ -52,4 +53,39 @@ export function displayPlaceType(type: unknown, subtype: unknown, props: Record<
     }
   }
   return fallback;
+}
+
+
+/** Aggregate diagnostics only: do not return venue names, user interests,
+ * coordinates, addresses, API responses, or upstream exception bodies.
+ */
+export type CandidateCoverage = {
+  returned: number;
+  compatiblePerSlot: number[];
+  withParsedCoordinates: number;
+  withAddress: number;
+  withGeocodeField: number;
+  withLocationField: number;
+  withCoordinatesField: number;
+  withGeometryField: number;
+  withRootGeometry: number;
+};
+
+export function summarizeCandidateCoverage(entities: PlaceLike[], slots = 6): CandidateCoverage {
+  const has = (value: unknown) => value !== undefined && value !== null;
+  return {
+    returned: entities.length,
+    compatiblePerSlot: Array.from({ length: slots }, (_, index) =>
+      entities.filter(entity => fitsSlot(entity, index)).length),
+    withParsedCoordinates: entities.filter(entity => Boolean(qlooCoordinates(entity))).length,
+    withAddress: entities.filter(entity => {
+      const p = entity.properties || {};
+      return typeof p.address === 'string' || typeof p.formatted_address === 'string';
+    }).length,
+    withGeocodeField: entities.filter(entity => has(entity.properties?.geocode)).length,
+    withLocationField: entities.filter(entity => has(entity.properties?.location)).length,
+    withCoordinatesField: entities.filter(entity => has(entity.properties?.coordinates)).length,
+    withGeometryField: entities.filter(entity => has(entity.properties?.geometry)).length,
+    withRootGeometry: entities.filter(entity => has((entity as PlaceLike & {geometry?:unknown}).geometry)).length,
+  };
 }
