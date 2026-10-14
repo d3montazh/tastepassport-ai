@@ -2,7 +2,7 @@
  * Honest, aggregate diagnostics. This never exports personal input, entity
  * identifiers, secret keys or raw Qloo explainability payloads.
  */
-import { qlooCoordinates, type Coordinate } from './venue-evidence';
+import { qlooCoordinates, qlooUsesGeohash, type Coordinate } from './venue-evidence';
 import { fitsSlot, type PlaceLike } from './route-quality';
 
 export type AuditableStop = {
@@ -63,6 +63,8 @@ export type CandidateCoverage = {
   returned: number;
   compatiblePerSlot: number[];
   withParsedCoordinates: number;
+  withValidGeohash: number;
+  withAnyGeohash: number;
   withAddress: number;
   withGeocodeField: number;
   withLocationField: number;
@@ -78,6 +80,8 @@ export function summarizeCandidateCoverage(entities: PlaceLike[], slots = 6): Ca
     compatiblePerSlot: Array.from({ length: slots }, (_, index) =>
       entities.filter(entity => fitsSlot(entity, index)).length),
     withParsedCoordinates: entities.filter(entity => Boolean(qlooCoordinates(entity))).length,
+    withValidGeohash: entities.filter(entity => qlooUsesGeohash(entity)).length,
+    withAnyGeohash: entities.filter(entity => typeof (entity.properties?.geocode as Record<string, unknown> | undefined)?.geohash === 'string').length,
     withAddress: entities.filter(entity => {
       const p = entity.properties || {};
       return typeof p.address === 'string' || typeof p.formatted_address === 'string';
