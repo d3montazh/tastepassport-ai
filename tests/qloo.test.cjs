@@ -464,3 +464,53 @@ test('recommend demo fallback records unavailable evidence honestly', async () =
   assert.equal(data.meta.audit.withCoordinates, 0);
   assert.ok(data.items.every(item => item.provenance === 'demo'));
 });
+
+
+test('recommend distinguishes missing Qloo credential without exposing it', async () => {
+  delete process.env.QLOO_API_KEY;
+  global.fetch = () => { throw new Error('Network should not be called'); };
+  const { data } = await call('recommend', { locale: 'ru' });
+  assert.equal(data.meta.qlooStatus, 'missing_key');
+  assert.equal(data.meta.fallback, true);
+  assert.equal(data.meta.audit.demo, 6);
+});
+
+test('recommend reports rejected Qloo credential without exposing the key', async () => {
+  process.env.QLOO_API_KEY = 'test-placeholder';
+  global.fetch = async () => new Response('{}', { status: 401 });
+  const { data } = await call('recommend', { locale: 'uk' });
+  assert.equal(data.meta.qlooStatus, 'invalid_key');
+  assert.equal(data.meta.fallback, true);
+  assert.ok(!JSON.stringify(data).includes('test-placeholder'));
+});
+
+test('recommend reports rate limit separately from missing results', async () => {
+  process.env.QLOO_API_KEY = 'test-placeholder';
+  global.fetch = async () => new Response('{}', { status: 429, headers: { 'retry-after': '120' } });
+  const { data } = await call('recommend');
+  assert.equal(data.meta.qlooStatus, 'rate_limited');
+});
+
+test('recommend reports unmatched interests separately from upstream errors', async () => {
+  process.env.QLOO_API_KEY = 'test-placeholder';
+  global.fetch = async () => Response.json({ results: [] });
+  const { data } = await call('recommend');
+  assert.equal(data.meta.qlooStatus, 'no_interest_matches');
+  assert.equal(data.meta.audit.demo, 6);
+});
+
+test('recommend reports empty Qloo place response separately', async () => {
+  process.env.QLOO_API_KEY = 'test-placeholder';
+  global.fetch = liveFetch([], []);
+  const { data } = await call('recommend');
+  assert.equal(data.meta.qlooStatus, 'no_results');
+});
+
+test('recommend distinguishes insufficient compatible venue categories', async () => {
+  process.env.QLOO_API_KEY = 'test-placeholder';
+  global.fetch = liveFetch([], Array.from({ length: 10 }, (_, i) => ({
+    name: `Hotel ${i}`, subtype: 'Hotel',
+  })));
+  const { data } = await call('recommend');
+  assert.equal(data.meta.qlooStatus, 'insufficient_compatible_venues');
+});
