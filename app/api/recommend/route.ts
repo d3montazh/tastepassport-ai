@@ -172,7 +172,7 @@ export async function POST(request: Request) {
       .slice(0, 8);
     const c = copyFor(locale);
 
-    const entities = await qlooPlaces({ city, interests, take: 8,
+    const entities = await qlooPlaces({ city, interests, take: 24,
       popularityMax: mode === 'unexpected' ? 0.82 : undefined });
     if (!entities.length) {
       const items = demoItems(city, origin, interests, mode, locale);
