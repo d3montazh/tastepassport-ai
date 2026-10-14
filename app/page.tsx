@@ -22,6 +22,8 @@ type ResultPayload = {
   items?: ResultItem[];
   meta?: {
     source?: string;
+    fallback?: boolean;
+    mixed?: boolean;
     mode?: string;
     matched?: number;
     origin?: string;
@@ -283,6 +285,8 @@ export default function Home() {
           replacementStyle,
           currentItem: result.items[index],
           currentNames: result.items.map((item) => item.name),
+          currentFallback: result.meta?.fallback,
+          currentMixed: result.meta?.mixed,
         }),
       });
       const data = await res.json();
@@ -301,7 +305,9 @@ export default function Home() {
           items: nextItems,
           meta: {
             ...current.meta,
-            source: data?.meta?.fallback ? data.meta.source : current.meta?.source,
+            source: data?.meta?.source || current.meta?.source,
+            fallback: data?.meta?.fallback ?? current.meta?.fallback,
+            mixed: data?.meta?.mixed ?? current.meta?.mixed,
             strategy: replacementStyle === 'surprise' ? t.strategySurprise : t.strategyCloser,
           },
         };
@@ -337,6 +343,8 @@ export default function Home() {
           locale,
           instruction: refineInstruction.trim(),
           currentItems: result.items,
+          currentFallback: result.meta?.fallback,
+          currentMixed: result.meta?.mixed,
         }),
       });
       const data = await res.json();
@@ -355,6 +363,8 @@ export default function Home() {
           meta: {
             ...current.meta,
             source: data?.meta?.source || current.meta?.source,
+            fallback: data?.meta?.fallback ?? current.meta?.fallback,
+            mixed: data?.meta?.mixed ?? current.meta?.mixed,
             strategy: data?.meta?.strategy || `${t.fullAdapted} “${refineInstruction.trim()}”`,
           },
         };
