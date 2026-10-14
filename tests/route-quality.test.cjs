@@ -33,3 +33,9 @@ test('unknown categories remain eligible without claiming verification', () => {
 test('excluded or repeated venues are not used as replacements', () => {
   assert.equal(selectForSlot([entity('Shop', 'Clothing store')], 1, ['shop']), undefined);
 });
+
+test('prioritizes documented place type over an unknown venue in each slot', () => {
+  const candidates = [entity('Mystery', undefined), entity('Museum', 'Museum')];
+  assert.equal(selectForSlot(candidates, 0)?.name, 'Museum');
+  assert.equal(selectForSlot([entity('Mystery', undefined), entity('Restaurant', 'Restaurant')], 2)?.name, 'Restaurant');
+});
