@@ -66,16 +66,25 @@ export function unchangedNote(locale: Locale, unsupported = false): string {
   return labels[locale] || labels.en;
 }
 
-export async function qlooPlaces(options: {
+export type QlooStatus =
+  'ok' | 'missing_key' | 'invalid_key' | 'rate_limited' | 'upstream_rejected' |
+  'upstream_unavailable' | 'timeout' | 'network_error' | 'no_interest_matches' |
+  'no_category_matches' | 'no_results' | 'unexpected_response';
+
+export type QlooResult = { entities: QlooEntity[]; status: QlooStatus };
+class QlooFailure extends Error {
+  constructor(readonly code: QlooStatus) { super('Qloo request not completed'); }
+}
+export async function qlooPlacesWithStatus(options: {
   city: string;
   interests: string[];
   take: number;
   popularityMax?: number;
   budget?: boolean;
   categories?: string[];
-}): Promise<QlooEntity[]> {
+}): Promise<QlooResult> {
   const key = process.env.QLOO_API_KEY?.trim();
-  if (!key || key === 'your_qloo_api_key_here') return [];
+  if (!key || key === 'your_qloo_api_key_here') return { entities: [], status: 'missing_key' };
   // One deadline covers searches, tag resolution and insights, including bodies.
   const signal = AbortSignal.timeout(12_000);
   const deadline = Date.now() + 12_000;
@@ -105,9 +114,14 @@ export async function qlooPlaces(options: {
     }
     // Do not log upstream bodies, headers, keys or exception objects.
     if (response.status === 404 && path === '/search') return { results: [] };
-    if (!response.ok) throw new Error('Qloo unavailable');
+    if (!response.ok) {
+      if (response.status === 401 || response.status === 403) throw new QlooFailure('invalid_key');
+      if (response.status === 429) throw new QlooFailure('rate_limited');
+      if (response.status >= 500) throw new QlooFailure('upstream_unavailable');
+      throw new QlooFailure('upstream_rejected');
+    }
     const data = await response.json();
-    if (data?.error) throw new Error('Qloo unavailable');
+    if (data?.error) throw new QlooFailure('unexpected_response');
     return data;
   }
   try {
@@ -122,7 +136,7 @@ export async function qlooPlaces(options: {
       }));
       ids.push(...matches.filter((id): id is string => typeof id === 'string' && !!id));
     }
-    if (!ids.length) return [];
+    if (!ids.length) return { entities: [], status: 'no_interest_matches' };
     // Resolve actual tag IDs; never send an instruction sentence as an entity.
     for (const category of (options.categories || []).slice(0, 4)) {
       const data = await get('/v2/tags', { 'filter.query': category, take: '50' });
@@ -130,7 +144,7 @@ export async function qlooPlaces(options: {
       const matches = Array.isArray(candidates) ? candidates.filter((tag: any) =>
         typeof tag?.id === 'string' && /^urn:tag:(genre|category):place:/.test(tag.id) &&
         String(tag.name).toLowerCase() === category.toLowerCase()) : [];
-      if (!matches.length) return [];
+      if (!matches.length) return { entities: [], status: 'no_category_matches' };
       // Qloo may return several place taxonomies with the same label.
       // Keep all exact matches instead of trusting the first (possibly empty) taxonomy.
       tags.push(...matches.map((tag: any) => tag.id));
@@ -150,17 +164,25 @@ export async function qlooPlaces(options: {
     }
     const data = await get('/v2/insights', params);
     const candidates = data?.results?.entities;
-    if (!Array.isArray(candidates)) return [];
+    if (!Array.isArray(candidates)) return { entities: [], status: 'unexpected_response' };
     const seen = new Set<string>();
-    return candidates.filter((entity: any): entity is QlooEntity => {
+    const entities = candidates.filter((entity: any): entity is QlooEntity => {
       if (typeof entity?.name !== 'string' || !entity.name.trim()) return false;
       const id = entity.name.trim().toLowerCase();
       if (seen.has(id)) return false;
       seen.add(id);
       return true;
     });
-  } catch {
-    // Missing access, throttling, timeouts and malformed responses all degrade safely.
-    return [];
+    return { entities, status: entities.length ? 'ok' : 'no_results' };
+  } catch (error) {
+    // Intentionally don't expose upstream bodies, URLs, headers, raw errors or credentials.
+    const status: QlooStatus = error instanceof QlooFailure ? error.code
+      : signal.aborted ? 'timeout' : 'network_error';
+    return { entities: [], status };
   }
+}
+
+/** Backward-compatible API for route refinements and replacements. */
+export async function qlooPlaces(options: Parameters<typeof qlooPlacesWithStatus>[0]): Promise<QlooEntity[]> {
+  return (await qlooPlacesWithStatus(options)).entities;
 }
