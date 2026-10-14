@@ -7,6 +7,7 @@ import { SAVED_ROUTE_KEY, parseSavedRoute, routeShareText, type SavedRoute } fro
 import { summarizeRoute } from './lib/route-audit';
 import RouteMap from './components/route-map';
 import { qlooStatusMessage } from './lib/qloo-status-copy';
+import { mapsLinkForVerifiedSource } from './lib/map-links';
 import type { QlooStatus } from './lib/qloo';
 
 type Mode = 'safe' | 'balanced' | 'unexpected';
@@ -68,22 +69,14 @@ const routeStorageCopy: Record<Locale, {
 
 const evidenceCopy: Record<Locale, {
   score: string; scoreInfo: string; noScore: string; schedule: string;
-  distance: string; far: string; maps: string;
+  distance: string; far: string; maps: string; demoLocation: string; missingLocation: string;
 }> = {
-  en: { score: 'Qloo affinity', scoreInfo: 'Qloo cultural affinity index, not the probability you will like this place.', noScore: 'No verified affinity score', schedule: 'Times are suggested. Opening hours and travel times have not been verified.', distance: 'From previous stop, straight line', far: 'Long gap between stops', maps: 'Open in Maps' },
-  ru: { score: 'Связь с твоим вкусом · Qloo', scoreInfo: 'Индекс культурной связи Qloo, а не вероятность того, что место тебе понравится.', noScore: 'Нет подтверждённой оценки', schedule: 'Время посещения примерное. Часы работы и время в пути не проверены.', distance: 'От предыдущего места по прямой', far: 'Большое расстояние между точками', maps: 'Открыть на карте' },
-  uk: { score: 'Зв’язок із твоїм смаком · Qloo', scoreInfo: 'Індекс культурного зв’язку Qloo, а не ймовірність того, що місце тобі сподобається.', noScore: 'Немає підтвердженої оцінки', schedule: 'Час відвідування орієнтовний. Години роботи й час у дорозі не перевірено.', distance: 'Від попереднього місця по прямій', far: 'Велика відстань між точками', maps: 'Відкрити на карті' },
-  es: { score: 'Afinidad Qloo', scoreInfo: 'Índice de afinidad cultural de Qloo; no es la probabilidad de que te guste.', noScore: 'Afinidad no disponible', schedule: 'Horarios sugeridos: no se han verificado horarios de apertura ni tiempos de viaje.', distance: 'Desde la parada anterior, en línea recta', far: 'Distancia larga entre paradas', maps: 'Abrir en el mapa' },
-  zh: { score: 'Qloo 品味关联', scoreInfo: 'Qloo 文化关联指数，并非你喜欢该地点的概率。', noScore: '缺少可核实的关联评分', schedule: '到访时间仅为建议；未核实营业时间及交通用时。', distance: '距上一站直线距离', far: '相邻站点距离较远', maps: '在地图中打开' },
+  en: { score: 'Qloo affinity', scoreInfo: 'Qloo cultural affinity index, not the probability you will like this place.', noScore: 'No verified affinity score', schedule: 'Times are suggested. Opening hours and travel times have not been verified.', distance: 'From previous stop, straight line', far: 'Long gap between stops', maps: 'Find on Maps', demoLocation: 'Demo idea — no real venue location', missingLocation: 'Map location unavailable' },
+  ru: { score: 'Связь с твоим вкусом · Qloo', scoreInfo: 'Индекс культурной связи Qloo, а не вероятность того, что место тебе понравится.', noScore: 'Нет подтверждённой оценки', schedule: 'Время посещения примерное. Часы работы и время в пути не проверены.', distance: 'От предыдущего места по прямой', far: 'Большое расстояние между точками', maps: 'Найти на карте', demoLocation: 'Демо-идея — адрес не подтверждён', missingLocation: 'Местоположение для карты недоступно' },
+  uk: { score: 'Зв’язок із твоїм смаком · Qloo', scoreInfo: 'Індекс культурного зв’язку Qloo, а не ймовірність того, що місце тобі сподобається.', noScore: 'Немає підтвердженої оцінки', schedule: 'Час відвідування орієнтовний. Години роботи й час у дорозі не перевірено.', distance: 'Від попереднього місця по прямій', far: 'Велика відстань між точками', maps: 'Знайти на карті', demoLocation: 'Демо-ідея — адресу не підтверджено', missingLocation: 'Розташування для карти недоступне' },
+  es: { score: 'Afinidad Qloo', scoreInfo: 'Índice de afinidad cultural de Qloo; no es la probabilidad de que te guste.', noScore: 'Afinidad no disponible', schedule: 'Horarios sugeridos: no se han verificado horarios de apertura ni tiempos de viaje.', distance: 'Desde la parada anterior, en línea recta', far: 'Distancia larga entre paradas', maps: 'Buscar en el mapa', demoLocation: 'Idea demo — sin ubicación verificada', missingLocation: 'No se dispone de ubicación en el mapa' },
+  zh: { score: 'Qloo 品味关联', scoreInfo: 'Qloo 文化关联指数，并非你喜欢该地点的概率。', noScore: '缺少可核实的关联评分', schedule: '到访时间仅为建议；未核实营业时间及交通用时。', distance: '距上一站直线距离', far: '相邻站点距离较远', maps: '在地图中搜索', demoLocation: '演示创意 — 无已确认位置', missingLocation: '无法提供地图位置' },
 };
-
-function mapsLink(item: ResultItem, city: string): string {
-  const point = item.coordinates;
-  const query = point && Number.isFinite(point.lat) && Number.isFinite(point.lng)
-    ? `${point.lat},${point.lng}`
-    : [item.name, item.address, city].filter(Boolean).join(', ');
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
-}
 
 const surpriseSeeds = [
   {
@@ -832,6 +825,7 @@ export default function Home() {
               const isReplacing = replacing?.index === i;
               const distanceKm = i > 0 ? aerialDistanceKm(result.items?.[i - 1]?.coordinates, item.coordinates) : undefined;
               const scoreAvailable = item.fitSource === 'qloo-affinity' && typeof item.fit === 'number' && Number.isFinite(item.fit);
+              const mapUrl = mapsLinkForVerifiedSource(item, city);
               return (
                 <article className={`route-card ${isReplacing ? 'is-replacing' : ''}`} key={`${item.name}-${i}`}>
                   <div className="route-step">
@@ -846,8 +840,12 @@ export default function Home() {
                       )}
                     </div>
                     <h3>{item.name}</h3>
-                    {item.address && <div className="address">⌖ {item.address}</div>}
-                    <div className="address"><a href={mapsLink(item, city)} target="_blank" rel="noopener noreferrer">↗ {evidenceCopy[locale].maps}</a></div>
+                    {item.provenance === 'qloo' && item.address && <div className="address">⌖ {item.address}</div>}
+                    {mapUrl
+                      ? <div className="address"><a href={mapUrl} target="_blank" rel="noopener noreferrer">↗ {evidenceCopy[locale].maps}</a></div>
+                      : <div className="address">{item.provenance === 'demo'
+                        ? evidenceCopy[locale].demoLocation
+                        : evidenceCopy[locale].missingLocation}</div>}
                     {distanceKm !== undefined && <div className="address">{evidenceCopy[locale].distance}: ≈ {distanceKm.toFixed(1)} km{distanceKm > 5 ? ` · ${evidenceCopy[locale].far}` : ''}</div>}
                     <p>{item.reason || t.matchFallback}</p>
                     {item.bridge && <div className="bridge"><span>{t.tasteBridge}</span>{item.bridge}</div>}

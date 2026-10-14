@@ -14,6 +14,7 @@ export type SavedStop = {
   bridge?: string;
   fit?: number;
   fitSource?: 'qloo-affinity';
+  provenance?: 'qloo' | 'demo';
   coordinates?: { lat: number; lng: number };
 };
 export type SavedRoute = {
@@ -43,6 +44,7 @@ function validStop(value: unknown): value is SavedStop {
     strings.every(key => v[key] === undefined || v[key] === null || stringOf(v[key], key === 'reason' ? 3000 : 600)) &&
     (v.fit === undefined || (typeof v.fit === 'number' && Number.isFinite(v.fit) && v.fit >= 0 && v.fit <= 100)) &&
     (v.fitSource === undefined || v.fitSource === 'qloo-affinity') &&
+    (v.provenance === undefined || v.provenance === 'qloo' || v.provenance === 'demo') &&
     (v.coordinates === undefined ||
       (v.coordinates !== null && typeof v.coordinates === 'object' &&
         typeof (v.coordinates as any).lat === 'number' && typeof (v.coordinates as any).lng === 'number' &&
@@ -73,12 +75,12 @@ export function parseSavedRoute(raw: string | null): SavedRoute | null {
 }
 
 export function routeShareText(route: SavedRoute, locale: string): string {
-  const labels: Record<string, { from: string; taste: string; source: string; affinity: string }> = {
-    en: { from: 'Route', taste: 'My taste', source: 'Source', affinity: 'Qloo affinity index' },
-    ru: { from: 'Маршрут', taste: 'Мои интересы', source: 'Источник', affinity: 'Индекс связи Qloo' },
-    uk: { from: 'Маршрут', taste: 'Мої інтереси', source: 'Джерело', affinity: 'Індекс зв’язку Qloo' },
-    es: { from: 'Ruta', taste: 'Mis gustos', source: 'Fuente', affinity: 'Afinidad Qloo' },
-    zh: { from: '路线', taste: '我的兴趣', source: '来源', affinity: 'Qloo 关联指数' },
+  const labels: Record<string, { from: string; taste: string; source: string; affinity: string; demo: string; unknown: string }> = {
+    en: { from: 'Route', taste: 'My taste', source: 'Source', affinity: 'Qloo affinity index', demo: 'DEMO IDEA — no verified venue', unknown: 'Location source unknown' },
+    ru: { from: 'Маршрут', taste: 'Мои интересы', source: 'Источник', affinity: 'Индекс связи Qloo', demo: 'ДЕМО-ИДЕЯ — не проверенное заведение', unknown: 'Источник места не подтверждён' },
+    uk: { from: 'Маршрут', taste: 'Мої інтереси', source: 'Джерело', affinity: 'Індекс зв’язку Qloo', demo: 'ДЕМО-ІДЕЯ — не перевірений заклад', unknown: 'Джерело місця не підтверджене' },
+    es: { from: 'Ruta', taste: 'Mis gustos', source: 'Fuente', affinity: 'Afinidad Qloo', demo: 'IDEA DEMO — lugar sin verificar', unknown: 'Fuente de ubicación desconocida' },
+    zh: { from: '路线', taste: '我的兴趣', source: '来源', affinity: 'Qloo 关联指数', demo: '演示创意 — 未核实地点', unknown: '地点来源未知' },
   };
   const c = labels[locale] ?? labels.en;
   const lines = [
@@ -88,8 +90,10 @@ export function routeShareText(route: SavedRoute, locale: string): string {
     `${c.source}: ${route.result.meta?.source || 'Unknown'}`, '',
   ];
   route.result.items.forEach((stop, index) => {
-    lines.push(`${index + 1}. ${stop.time ? stop.time + ' · ' : ''}${stop.name}`);
-    if (stop.address) lines.push(stop.address);
+    const status = stop.provenance === 'demo' ? c.demo :
+      stop.provenance !== 'qloo' ? c.unknown : '';
+    lines.push(`${index + 1}. ${stop.time ? stop.time + ' · ' : ''}${stop.name}${status ? ' — ' + status : ''}`);
+    if (stop.provenance === 'qloo' && stop.address) lines.push(stop.address);
     if (stop.fitSource === 'qloo-affinity' && typeof stop.fit === 'number' && Number.isFinite(stop.fit)) {
       lines.push(`${c.affinity}: ${Math.min(100, Math.max(0, stop.fit))}%`);
     }
