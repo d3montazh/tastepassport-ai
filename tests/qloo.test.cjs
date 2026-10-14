@@ -514,3 +514,53 @@ test('recommend distinguishes insufficient compatible venue categories', async (
   const { data } = await call('recommend');
   assert.equal(data.meta.qlooStatus, 'insufficient_compatible_venues');
 });
+
+
+test('partial Qloo responses keep live venues and fill only missing itinerary slots with labeled demo', async () => {
+  process.env.QLOO_API_KEY = 'test-placeholder';
+  const realPlaces = [
+    { entity_id: 'cafe', name: 'Real Midtown Cafe', subtype: 'Restaurant',
+      properties: { address: '123 7th Ave' }, affinity: 0.82 },
+    { entity_id: 'shop', name: 'Real Fashion Store', subtype: 'Clothing store',
+      properties: { address: '5 Fashion Street' } },
+  ];
+  global.fetch = liveFetch([], realPlaces);
+  const { data, status } = await call('recommend', { locale: 'ru' });
+  assert.equal(status, 200);
+  assert.equal(data.meta.mixed, true);
+  assert.equal(data.meta.fallback, true);
+  assert.equal(data.meta.matched, 2);
+  assert.equal(data.meta.qlooStatus, 'insufficient_compatible_venues');
+  assert.equal(data.meta.audit.qloo, 2);
+  assert.equal(data.meta.audit.demo, 4);
+  assert.equal(data.items.length, 6);
+  assert.equal(data.items[2].name, 'Real Midtown Cafe');
+  assert.equal(data.items[2].fit, 82);
+  assert.equal(data.items[1].name, 'Real Fashion Store');
+  assert.equal(data.items[1].provenance, 'qloo');
+  assert.equal(data.items[0].provenance, 'demo');
+  assert.match(data.meta.source, /Qloo \+ демо/);
+});
+
+test('when no Qloo results are available keep honest all-demo route and zero real matches', async () => {
+  delete process.env.QLOO_API_KEY;
+  global.fetch = () => { throw new Error('Should not call Qloo'); };
+  const { data } = await call('recommend');
+  assert.equal(data.meta.mixed, undefined);
+  assert.equal(data.meta.matched, 0);
+  assert.equal(data.meta.audit.qloo, 0);
+  assert.equal(data.meta.audit.demo, 6);
+});
+
+test('incompatible hotels are never used as live food or nightlife venues', async () => {
+  process.env.QLOO_API_KEY = 'test-placeholder';
+  global.fetch = liveFetch([], [
+    { name: 'Hotel A', subtype: 'Hotel' },
+    { name: 'Real Restaurant', subtype: 'Restaurant' },
+  ]);
+  const { data } = await call('recommend');
+  assert.equal(data.items[2].name, 'Real Restaurant');
+  assert.equal(data.items[2].provenance, 'qloo');
+  assert.equal(data.meta.audit.qloo, 1);
+  assert.equal(data.meta.audit.demo, 5);
+});
