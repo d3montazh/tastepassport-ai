@@ -343,3 +343,12 @@
 }
 .route-card .address a{color:#a4baff;text-decoration:underline;text-underline-offset:3px}
 .route-card .address a:focus-visible{outline:2px solid #a4baff;outline-offset:3px}
+
+.route-utility-actions{display:flex;gap:9px;flex-wrap:wrap;margin:12px 0 9px}
+.route-utility-actions button{
+  border:1px solid #34425f;background:rgba(20,27,44,.8);color:#d5e0fa;
+  padding:10px 13px;border-radius:12px;font-size:12px;font-weight:750;cursor:pointer
+}
+.route-utility-actions button:hover{border-color:#8c9cff;background:#202b45}
+.route-utility-actions button:focus-visible{outline:2px solid #a4baff;outline-offset:2px}
+.route-storage-info{font-size:11px;color:#8391aa;margin-bottom:16px;line-height:1.5}
