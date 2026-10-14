@@ -330,3 +330,16 @@
   .loading-track>i::after,.loading-steps>div.active>span,.taste-map-line>i{animation:none!important}
   .taste-map-card.is-visible .taste-map-row{opacity:1!important;animation:none!important}
 }
+
+.route-evidence-note{
+  margin:16px 0 18px;
+  padding:12px 15px;
+  border:1px solid #303950;
+  border-radius:12px;
+  background:#101622;
+  color:#a9b7d1;
+  font-size:12px;
+  line-height:1.55;
+}
+.route-card .address a{color:#a4baff;text-decoration:underline;text-underline-offset:3px}
+.route-card .address a:focus-visible{outline:2px solid #a4baff;outline-offset:3px}
