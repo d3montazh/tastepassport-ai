@@ -1,5 +1,5 @@
 import { selectForSlot } from '../../lib/route-quality';
-import { qlooPlaces, unchangedNote, requestError } from '../../lib/qloo';
+import { qlooPlaces, unchangedNote, requestError, mixedSource } from '../../lib/qloo';
 import { NextResponse } from 'next/server';
 import { normalizeLocale, type Locale } from '../../i18n';
 
@@ -145,7 +145,12 @@ export async function POST(request: Request) {
       fit: undefined,
     };
 
-    return NextResponse.json({ item, meta: { changed: true, source: 'Qloo Insights API', fallback: false, action: replacementStyle, origin, destination: city, note: replacementStyle === 'surprise' ? copy.noteSurprise : copy.noteCloser } });
+    const mixed = Boolean(body?.currentFallback || body?.currentMixed);
+    return NextResponse.json({ item, meta: {
+      changed: true, source: mixed ? mixedSource(locale) : 'Qloo Insights API',
+      fallback: mixed, mixed, action: replacementStyle, origin, destination: city,
+      note: replacementStyle === 'surprise' ? copy.noteSurprise : copy.noteCloser,
+    } });
   } catch {
     return NextResponse.json({ error: requestError(errorLocale) }, { status: 400 });
   }
