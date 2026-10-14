@@ -104,15 +104,27 @@ export function selectPartialItinerary<T extends PlaceLike>(
 ): Array<T | undefined> {
   const selected: Array<T | undefined> = Array(slots).fill(undefined);
   const used = new Set<string>();
-  // Specialized itinerary roles first, then flexible cultural stops.
-  const priorities = [2, 1, 5, 4, 3, 0];
-  const order = [...priorities.filter(index => index < slots),
-    ...Array.from({ length: slots }, (_, index) => index).filter(index => !priorities.includes(index))];
-  for (const index of order) {
-    const place = selectForSlot(candidates, index, used);
-    if (!place) continue;
-    selected[index] = place;
-    used.add(place.name!.trim().toLowerCase());
+  // First reserve known, exact category matches for the right roles.
+  // Then fill remaining slots in normal order, preserving Qloo ranking for
+  // generic/unknown entities so existing full-route behavior is stable.
+  const priority = [2, 1, 5, 3, 0, 4];
+  for (const index of [...priority.filter(i => i < slots),
+    ...Array.from({ length: slots }, (_, i) => i).filter(i => !priority.includes(i))]) {
+    const role = SLOT_ROLES[index];
+    const candidate = candidates.find(place => {
+      const name = typeof place.name === 'string' ? place.name.trim().toLowerCase() : '';
+      return name && !used.has(name) && knownCategory(placeCategory(place)) === role;
+    });
+    if (!candidate) continue;
+    selected[index] = candidate;
+    used.add(candidate.name!.trim().toLowerCase());
+  }
+  for (let index = 0; index < slots; index++) {
+    if (selected[index]) continue;
+    const candidate = selectForSlot(candidates, index, used);
+    if (!candidate) continue;
+    selected[index] = candidate;
+    used.add(candidate.name!.trim().toLowerCase());
   }
   return selected;
 }
