@@ -45,10 +45,21 @@ test('candidate coverage is a numeric-only summary of all Qloo results', () => {
   ]);
   assert.deepEqual(stats, {
     returned: 3, compatiblePerSlot: [1, 1, 2, 1, 1, 1],
-    withParsedCoordinates: 1, withAddress: 1, withGeocodeField: 1,
+    withParsedCoordinates: 1, withValidGeohash: 0, withAnyGeohash: 0, withAddress: 1, withGeocodeField: 1,
     withLocationField: 1, withCoordinatesField: 0,
     withGeometryField: 1, withRootGeometry: 0,
   });
   assert.ok(!JSON.stringify(stats).includes('Private street'));
   assert.ok(!JSON.stringify(stats).includes('Mystery'));
+});
+
+test('candidate report counts precise geohash cells without exposing actual geohash values', () => {
+  const stats = summarizeCandidateCoverage([
+    { name: 'Place A', properties: { geocode: { geohash: 'ezs42e44' } } },
+    { name: 'Place B', properties: { geocode: { geohash: 'ezs42' } } },
+  ]);
+  assert.equal(stats.withAnyGeohash, 2);
+  assert.equal(stats.withValidGeohash, 1);
+  assert.equal(stats.withParsedCoordinates, 1);
+  assert.ok(!JSON.stringify(stats).includes('ezs42'));
 });
