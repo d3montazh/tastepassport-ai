@@ -9,6 +9,7 @@ export type MapLinkStop = {
   address?: string | null;
   provenance?: 'qloo' | 'demo';
   coordinates?: Coordinate;
+  coordinatesApproximate?: boolean;
 };
 
 function usablePoint(point: Coordinate | undefined): point is Coordinate {
@@ -18,14 +19,18 @@ function usablePoint(point: Coordinate | undefined): point is Coordinate {
 
 export function mapsLinkForVerifiedSource(item: MapLinkStop, city: string): string | undefined {
   if (item.provenance !== 'qloo') return undefined;
-  if (usablePoint(item.coordinates)) {
+  const name = typeof item.name === 'string' ? item.name.trim() : '';
+  const address = typeof item.address === 'string' ? item.address.trim() : '';
+  // A geohash cell center is an approximation. When Qloo provides a
+  // venue name+address, prefer the search over precise-looking false pins.
+  if (!item.coordinatesApproximate && usablePoint(item.coordinates)) {
     const location = `${item.coordinates.lat},${item.coordinates.lng}`;
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
   }
-
-  const name = typeof item.name === 'string' ? item.name.trim() : '';
-  const address = typeof item.address === 'string' ? item.address.trim() : '';
-  if (!name || !address) return undefined;
+  if (!name || !address) {
+    // Don't send an approximate geohash cell center as an exact venue.
+    return undefined;
+  }
 
   // A Qloo-supplied textual address is only a search hint; destination
   // identity still needs to be checked in Maps by the user.
