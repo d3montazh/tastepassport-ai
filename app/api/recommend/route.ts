@@ -1,6 +1,7 @@
 import { selectItinerary } from '../../lib/route-quality';
 import { qlooPlaces, fallbackSource, requestError } from '../../lib/qloo';
 import { NextResponse } from 'next/server';
+import { qlooAffinityPercent, qlooCoordinates } from '../../lib/venue-evidence';
 import { normalizeLocale, type Locale } from '../../i18n';
 
 type QlooEntity = {
@@ -209,7 +210,9 @@ export async function POST(request: Request) {
         time: routeTimes[index],
         phase: c.phases[index],
         bridge: c.liveBridge(interests[index % Math.max(interests.length, 1)] || 'Taste DNA', city),
-        fit: undefined,
+        fit: qlooAffinityPercent(entity),
+        fitSource: qlooAffinityPercent(entity) !== undefined ? 'qloo-affinity' : undefined,
+        coordinates: qlooCoordinates(entity),
       };
     });
 
