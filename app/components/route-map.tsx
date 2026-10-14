@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Locale } from '../i18n';
 import type { Coordinate } from '../lib/venue-evidence';
 
-type MapStop = { name: string; coordinates?: Coordinate };
+type MapStop = { name: string; coordinates?: Coordinate; coordinatesApproximate?: boolean };
 type RouteResponse = {
   available?: boolean; mode?: string; source?: string;
   distanceKm?: number; durationMinutes?: number; geometry?: number[][];
@@ -80,7 +80,7 @@ export default function RouteMap({ stops, locale }: { stops: MapStop[]; locale: 
         available.forEach(stop => {
           const marker = L.marker([stop.coordinates.lat, stop.coordinates.lng]).addTo(map);
           const popup = document.createElement('div');
-          popup.textContent = `${stop.index + 1}. ${stop.name}`;
+          popup.textContent = `${stop.index + 1}. ${stop.name}${stop.coordinatesApproximate ? ' · ≈' : ''}`;
           marker.bindPopup(popup);
         });
         const outline = L.polyline(positions, { color: '#9bb2ff', weight: 3, dashArray: '7,9' }).addTo(map);
