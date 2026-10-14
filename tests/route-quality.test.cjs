@@ -39,3 +39,21 @@ test('prioritizes documented place type over an unknown venue in each slot', () 
   assert.equal(selectForSlot(candidates, 0)?.name, 'Museum');
   assert.equal(selectForSlot([entity('Mystery', undefined), entity('Restaurant', 'Restaurant')], 2)?.name, 'Restaurant');
 });
+
+
+test('partial selection keeps scarce specialized venues in their roles', () => {
+  const { selectPartialItinerary } = require('../app/lib/route-quality.ts');
+  const candidates = [
+    { name: 'Shop A', subtype: 'Clothing store' },
+    { name: 'Cafe A', subtype: 'Restaurant' },
+    { name: 'Hotel A', subtype: 'Hotel' },
+    { name: 'Gallery A', subtype: 'Art gallery' },
+  ];
+  const selected = selectPartialItinerary(candidates);
+  assert.equal(selected.length, 6);
+  assert.equal(selected[1]?.name, 'Shop A');
+  assert.equal(selected[2]?.name, 'Cafe A');
+  assert.equal(selected[0]?.name, 'Gallery A');
+  assert.equal(selected[5], undefined);
+  assert.equal(selected.some(item => item?.name === 'Hotel A'), false);
+});
