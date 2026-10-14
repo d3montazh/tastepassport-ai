@@ -31,6 +31,8 @@ test('reject malformed or oversized cached route snapshots', () => {
     JSON.stringify({ ...route, result: { items: [] } }),
     JSON.stringify({ ...route, result: { items: [{ name: '' }] } }),
     JSON.stringify({ ...route, mode: 'hijack' }),
+    JSON.stringify({ ...route, result: { items: [{ name: 'Place', coordinates: { lat: 200, lng: 3 } }] } }),
+    JSON.stringify({ ...route, result: { items: [{ name: 'Place' }], meta: { source: { malicious: true } } } }),
   ]) {
     assert.equal(parseSavedRoute(raw), null);
   }
