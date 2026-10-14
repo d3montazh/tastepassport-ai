@@ -1,6 +1,7 @@
 import { selectForSlot, selectItinerary } from '../../lib/route-quality';
 import { qlooPlaces, unchangedNote, requestError, mixedSource } from '../../lib/qloo';
 import { NextResponse } from 'next/server';
+import { qlooAffinityPercent, qlooCoordinates } from '../../lib/venue-evidence';
 import { normalizeLocale, type Locale } from '../../i18n';
 
 type RouteItem = {
@@ -181,7 +182,9 @@ export async function POST(request: Request) {
         address: props.address || props.formatted_address || null,
         reason: copy.liveReason(instruction),
         bridge: `${interests[index % Math.max(interests.length, 1)] || copy.bridgeTaste} + ${instruction} → ${city}`,
-        fit: undefined,
+        fit: qlooAffinityPercent(entity),
+        fitSource: qlooAffinityPercent(entity) !== undefined ? 'qloo-affinity' : undefined,
+        coordinates: qlooCoordinates(entity),
       };
     });
     const scopedNotes: Record<Locale, string> = {
