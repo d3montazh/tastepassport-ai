@@ -1,3 +1,4 @@
+import { selectItinerary } from '../../lib/route-quality';
 import { qlooPlaces, unchangedNote, requestError } from '../../lib/qloo';
 import { NextResponse } from 'next/server';
 import { normalizeLocale, type Locale } from '../../i18n';
@@ -136,7 +137,8 @@ export async function POST(request: Request) {
     const supported = intent.lessTouristy || intent.budget || categories.length > 0;
     const entities = supported ? await qlooPlaces({ city, interests, take: 20, categories,
       budget: intent.budget, popularityMax: intent.lessTouristy || mode === 'unexpected' ? 0.65 : undefined }) : [];
-    if (entities.length < currentItems.length) {
+    const selected = selectItinerary(entities, currentItems.length);
+    if (selected.length < currentItems.length) {
       return NextResponse.json({ items: currentItems, meta: {
         changed: false, fallback: true,
         reason: supported ? 'no_matches_or_unavailable' : 'unsupported_instruction',
@@ -145,7 +147,7 @@ export async function POST(request: Request) {
     }
 
     const items = currentItems.map((current, index) => {
-      const entity = entities[index];
+      const entity = selected[index];
       const props = entity?.properties || {};
       return {
         ...current,
@@ -154,7 +156,7 @@ export async function POST(request: Request) {
         address: props?.address || props?.formatted_address || null,
         reason: copy.liveReason(instruction),
         bridge: `${interests[index % Math.max(interests.length, 1)] || copy.bridgeTaste} + ${instruction} → ${city}`,
-        fit: Math.max(74, 93 - index * 4),
+        fit: undefined,
       };
     });
 
