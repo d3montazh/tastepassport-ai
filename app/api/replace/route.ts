@@ -1,6 +1,7 @@
 import { selectForSlot } from '../../lib/route-quality';
 import { qlooPlaces, unchangedNote, requestError, mixedSource } from '../../lib/qloo';
 import { NextResponse } from 'next/server';
+import { displayPlaceType, summarizeRoute } from '../../lib/route-audit';
 import { qlooAffinityPercent, qlooCoordinates } from '../../lib/venue-evidence';
 import { normalizeLocale, type Locale } from '../../i18n';
 
@@ -138,7 +139,8 @@ export async function POST(request: Request) {
     const props = entity?.properties || {};
     const item = {
       name: entity?.name || copy.unexpected,
-      type: entity?.subtype || entity?.type || props?.subtype || currentItem.type || copy.place,
+      type: displayPlaceType(entity.type, entity.subtype, props, currentItem.type || copy.place),
+      provenance: 'qloo' as const,
       address: props?.address || props?.formatted_address || null,
       time: currentItem.time,
       phase: currentItem.phase,

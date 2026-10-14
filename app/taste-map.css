@@ -352,3 +352,18 @@
 .route-utility-actions button:hover{border-color:#8c9cff;background:#202b45}
 .route-utility-actions button:focus-visible{outline:2px solid #a4baff;outline-offset:2px}
 .route-storage-info{font-size:11px;color:#8391aa;margin-bottom:16px;line-height:1.5}
+
+
+/* Qloo coverage is an audit of available evidence, not a taste confidence score. */
+.tp-quality{margin:14px 0 22px;border:1px solid #2a3449;background:#101522;border-radius:18px;padding:17px}
+.tp-quality h3{font-size:14px;color:#dce5ff;margin:0 0 13px}
+.tp-quality-metrics{display:flex;gap:9px;flex-wrap:wrap}
+.tp-quality-metrics span{font-size:12px;padding:9px 12px;border:1px solid #303a51;border-radius:10px;color:#b3c1d7;background:#0b101b}
+.tp-quality-metrics b{color:#fff;font-variant-numeric:tabular-nums}
+.tp-quality p,.tp-osm-caption{font-size:12px;color:#91a1bc;line-height:1.6;margin:11px 0 0}
+.tp-map-toggle{display:inline-block;margin-top:14px;border:1px solid #677fae;background:#1a2640;color:#e5edff;border-radius:12px;padding:11px 16px;cursor:pointer;font-weight:750}
+.tp-map-toggle:focus-visible{outline:2px solid #b2c6ff;outline-offset:2px}
+.tp-osm-wrap{margin-top:14px}
+.tp-osm-map{width:100%;height:min(430px,70vh);min-height:290px;background:#202a3d;border:1px solid #34415b;border-radius:12px;overflow:hidden;z-index:0}
+.tp-osm-caption{margin-top:9px}
+@media(max-width:620px){.tp-osm-map{height:320px;min-height:260px}}

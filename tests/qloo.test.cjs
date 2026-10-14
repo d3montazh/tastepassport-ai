@@ -432,3 +432,35 @@ test('Qloo scoped refinement retains any other stops unchanged and provides scor
   assert.deepEqual(data.items[0], original[0]);
   assert.deepEqual(data.items[2], original[2]);
 });
+
+
+test('recommend includes auditable Qloo provenance and readable types', async () => {
+  process.env.QLOO_API_KEY = 'test-placeholder';
+  const venues = Array.from({ length: 8 }, (_, index) => ({
+    name: `Venue ${index}`, type: 'urn:entity:place', affinity: index === 0 ? 0.88 : undefined,
+    properties: { geocode: { latitude: 40.7 + index / 1000, longitude: -74 } },
+  }));
+  global.fetch = liveFetch([], venues);
+  const { data } = await call('recommend', { locale: 'uk' });
+  assert.equal(data.meta.fallback, false);
+  assert.equal(data.items[0].type, 'Місце');
+  assert.equal(data.items[0].provenance, 'qloo');
+  assert.equal(data.meta.audit.total, 6);
+  assert.equal(data.meta.audit.qloo, 6);
+  assert.equal(data.meta.audit.demo, 0);
+  assert.equal(data.meta.audit.withAffinity, 1);
+  assert.equal(data.meta.audit.withCoordinates, 6);
+});
+
+test('recommend demo fallback records unavailable evidence honestly', async () => {
+  delete process.env.QLOO_API_KEY;
+  global.fetch = () => { throw new Error('Network must not be accessed'); };
+  const { data } = await call('recommend', { locale: 'ru' });
+  assert.equal(data.meta.fallback, true);
+  assert.equal(data.meta.fallbackReason, 'qloo_unavailable_or_no_results');
+  assert.equal(data.meta.audit.qloo, 0);
+  assert.equal(data.meta.audit.demo, 6);
+  assert.equal(data.meta.audit.withAffinity, 0);
+  assert.equal(data.meta.audit.withCoordinates, 0);
+  assert.ok(data.items.every(item => item.provenance === 'demo'));
+});

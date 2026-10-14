@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { languages, normalizeLocale, uiCopy, type Locale } from './i18n';
 import { aerialDistanceKm, type Coordinate } from './lib/venue-evidence';
 import { SAVED_ROUTE_KEY, parseSavedRoute, routeShareText, type SavedRoute } from './lib/route-storage';
+import { summarizeRoute } from './lib/route-audit';
+import RouteMap from './components/route-map';
 
 type Mode = 'safe' | 'balanced' | 'unexpected';
 type ReplacementStyle = 'closer' | 'surprise';
@@ -19,6 +21,7 @@ type ResultItem = {
   fit?: number;
   fitSource?: 'qloo-affinity';
   coordinates?: Coordinate;
+  provenance?: 'qloo' | 'demo';
 };
 
 type ResultPayload = {
@@ -33,7 +36,20 @@ type ResultPayload = {
     origin?: string;
     destination?: string;
     strategy?: string;
+    fallbackReason?: 'qloo_unavailable_or_no_results' | 'insufficient_compatible_venues';
   };
+};
+
+const qualityCopy: Record<Locale, {
+  title: string; qloo: string; demo: string; unknown: string;
+  scores: string; coords: string; mapOpen: string; mapClose: string;
+  mapPrompt: string; noMap: string; disclaimer: string;
+}> = {
+  en: { title: 'Route evidence', qloo: 'Qloo places', demo: 'Demo stops', unknown: 'Unknown origin', scores: 'With affinity', coords: 'With coordinates', mapOpen: 'Show OpenStreetMap', mapClose: 'Hide map', mapPrompt: 'Open the map only if you want to load third-party OpenStreetMap tiles. This sends viewport data to the tile service. Roads are shown only if routing is configured.', noMap: 'At least two geocoded stops are needed for the map.', disclaimer: 'Coverage describes data availability, not recommendation quality.' },
+  ru: { title: 'Данные о маршруте', qloo: 'Точки Qloo', demo: 'Демо-точки', unknown: 'Источник неизвестен', scores: 'С оценкой Qloo', coords: 'С координатами', mapOpen: 'Показать OpenStreetMap', mapClose: 'Скрыть карту', mapPrompt: 'Карта загружается только по нажатию. При этом OpenStreetMap получает данные о просматриваемой области. Маршрут по дорогам появится только после подключения сервиса.', noMap: 'Для карты нужны координаты хотя бы двух точек.', disclaimer: 'Показатели отражают полноту данных, а не качество рекомендаций.' },
+  uk: { title: 'Дані про маршрут', qloo: 'Точки Qloo', demo: 'Демо-зупинки', unknown: 'Джерело невідоме', scores: 'З оцінкою Qloo', coords: 'З координатами', mapOpen: 'Показати OpenStreetMap', mapClose: 'Сховати карту', mapPrompt: 'Карта завантажується лише після натискання. OpenStreetMap отримає дані про область перегляду. Маршрут дорогами буде доступний лише після підключення сервісу.', noMap: 'Для карти потрібні координати принаймні двох зупинок.', disclaimer: 'Показники відображають наявність даних, а не якість рекомендацій.' },
+  es: { title: 'Datos de la ruta', qloo: 'Lugares Qloo', demo: 'Paradas demo', unknown: 'Fuente desconocida', scores: 'Con afinidad', coords: 'Con coordenadas', mapOpen: 'Mostrar OpenStreetMap', mapClose: 'Ocultar mapa', mapPrompt: 'El mapa se carga solo al pulsar. OpenStreetMap recibirá información de la zona visible. Las rutas por carretera requieren un servidor configurado.', noMap: 'Se necesitan al menos dos lugares con coordenadas.', disclaimer: 'Los indicadores muestran disponibilidad de datos, no calidad de las recomendaciones.' },
+  zh: { title: '路线数据', qloo: 'Qloo 地点', demo: '演示地点', unknown: '来源未知', scores: '有偏好评分', coords: '有坐标', mapOpen: '显示 OpenStreetMap', mapClose: '隐藏地图', mapPrompt: '地图只会在点击后加载。OpenStreetMap 会收到当前地图区域信息。道路导航需另行配置服务。', noMap: '地图至少需要两个具有坐标的地点。', disclaimer: '这些数值反映数据完整度，并非推荐质量。' },
 };
 
 const routeStorageCopy: Record<Locale, {
@@ -187,6 +203,7 @@ export default function Home() {
   const [refining, setRefining] = useState(false);
   const [hasSavedRoute, setHasSavedRoute] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
+  const [mapVisible, setMapVisible] = useState(false);
 
   useEffect(() => {
     try { setHasSavedRoute(Boolean(parseSavedRoute(window.localStorage.getItem(SAVED_ROUTE_KEY)))); } catch { setHasSavedRoute(false); }
@@ -202,6 +219,8 @@ export default function Home() {
     window.localStorage.setItem('tastepassport-locale', locale);
     window.dispatchEvent(new CustomEvent('tastepassport:language', { detail: locale }));
   }, [locale]);
+
+  const audit = useMemo(() => summarizeRoute(result?.items || []), [result]);
 
   const modeCopy: Record<Mode, { label: string; note: string }> = {
     safe: { label: t.safe, note: t.safeNote },
@@ -259,6 +278,7 @@ export default function Home() {
       setCity(stored.city);
       setMode(stored.mode);
       setResult(stored.result);
+      setMapVisible(false);
       setAgentMessage('');
       setError('');
       setSaveMessage(routeStorageCopy[locale].restored);
@@ -299,6 +319,7 @@ export default function Home() {
     setCity(next.city);
     setMode('unexpected');
     setResult(null);
+    setMapVisible(false);
     setError('');
     setAgentMessage('');
   }
@@ -309,6 +330,7 @@ export default function Home() {
     setLoadingProgress(14);
     setError('');
     setResult(null);
+    setMapVisible(false);
     setAgentMessage('');
 
     const startedAt = Date.now();
@@ -648,6 +670,40 @@ export default function Home() {
             {hasSavedRoute && <button type="button" onClick={deleteSavedRoute}>{routeStorageCopy[locale].remove}</button>}
           </div>
           <div className="route-storage-info" role="status">{saveMessage || routeStorageCopy[locale].info}</div>
+
+          <section className="tp-quality" aria-label={qualityCopy[locale].title}>
+            <h3>{qualityCopy[locale].title}</h3>
+            <div className="tp-quality-metrics">
+              <span>{qualityCopy[locale].qloo}: <b>{audit.qloo}/{audit.total}</b></span>
+              <span>{qualityCopy[locale].demo}: <b>{audit.demo}/{audit.total}</b></span>
+              {audit.unknown > 0 && <span>{qualityCopy[locale].unknown}: <b>{audit.unknown}</b></span>}
+              <span>{qualityCopy[locale].scores}: <b>{audit.withAffinity}/{audit.total}</b></span>
+              <span>{qualityCopy[locale].coords}: <b>{audit.withCoordinates}/{audit.total}</b></span>
+            </div>
+            <p>{qualityCopy[locale].disclaimer}</p>
+            {result.meta?.fallbackReason && <p>
+              {result.meta.fallbackReason === 'insufficient_compatible_venues'
+                ? (locale === 'ru' ? 'Qloo не дал достаточно мест нужных категорий для полного маршрута; показан демо-вариант.'
+                  : locale === 'uk' ? 'Qloo не повернув достатньо місць потрібних категорій; показано демо-маршрут.'
+                  : locale === 'es' ? 'Qloo no devolvió suficientes lugares adecuados; se muestra una ruta demo.'
+                  : locale === 'zh' ? 'Qloo 未提供足够的匹配地点，因此显示演示路线。'
+                  : 'Qloo returned too few compatible venues; showing a demo route.')
+                : (locale === 'ru' ? 'Нет подходящего ответа Qloo или сервис недоступен; показан демо-маршрут.'
+                  : locale === 'uk' ? 'Немає придатної відповіді Qloo або сервіс недоступний; показано демо-маршрут.'
+                  : locale === 'es' ? 'Qloo no devolvió resultados utilizables o no estuvo disponible; se muestra una ruta demo.'
+                  : locale === 'zh' ? 'Qloo 未返回可用结果或暂不可用，因此显示演示路线。'
+                  : 'No usable Qloo result or service unavailable; showing a demo route.')}
+            </p>}
+            {audit.withCoordinates >= 2
+              ? <>
+                  <button type="button" className="tp-map-toggle" onClick={() => setMapVisible(value => !value)}>
+                    {mapVisible ? qualityCopy[locale].mapClose : qualityCopy[locale].mapOpen}
+                  </button>
+                  {!mapVisible && <p>{qualityCopy[locale].mapPrompt}</p>}
+                  {mapVisible && <RouteMap stops={result.items || []} locale={locale} />}
+                </>
+              : <p>{qualityCopy[locale].noMap}</p>}
+          </section>
 
           <div className="translation-map">
             <div className="translation-city">

@@ -1,6 +1,7 @@
 import { selectForSlot, selectItinerary } from '../../lib/route-quality';
 import { qlooPlaces, unchangedNote, requestError, mixedSource } from '../../lib/qloo';
 import { NextResponse } from 'next/server';
+import { displayPlaceType, summarizeRoute } from '../../lib/route-audit';
 import { qlooAffinityPercent, qlooCoordinates } from '../../lib/venue-evidence';
 import { normalizeLocale, type Locale } from '../../i18n';
 
@@ -179,7 +180,8 @@ export async function POST(request: Request) {
       return {
         ...current,
         name: entity.name,
-        type: entity.subtype || entity.type || props.subtype || current.type || copy.place,
+        type: displayPlaceType(entity.type, entity.subtype, props, current.type || copy.place),
+        provenance: 'qloo' as const,
         address: props.address || props.formatted_address || null,
         reason: copy.liveReason(instruction),
         bridge: `${interests[index % Math.max(interests.length, 1)] || copy.bridgeTaste} + ${instruction} → ${city}`,
@@ -199,7 +201,7 @@ export async function POST(request: Request) {
     // Retained demo stops must not be presented as a fully live route.
     const mixed = Boolean(body?.currentFallback || body?.currentMixed) && updatedIndices.length < currentItems.length;
     return NextResponse.json({ items, meta: {
-      changed: true, updatedIndices,
+      changed: true, updatedIndices, audit: summarizeRoute(items),
       source: mixed ? mixedSource(locale) : 'Qloo Insights API', fallback: mixed, mixed,
       origin, destination: city, instruction,
       strategy: targeted ? note : copy.liveStrategy(instruction), note,
