@@ -36,6 +36,7 @@ type ResultPayload = {
     origin?: string;
     destination?: string;
     strategy?: string;
+    fallbackReason?: 'qloo_unavailable_or_no_results' | 'insufficient_compatible_venues';
   };
 };
 
@@ -680,6 +681,19 @@ export default function Home() {
               <span>{qualityCopy[locale].coords}: <b>{audit.withCoordinates}/{audit.total}</b></span>
             </div>
             <p>{qualityCopy[locale].disclaimer}</p>
+            {result.meta?.fallbackReason && <p>
+              {result.meta.fallbackReason === 'insufficient_compatible_venues'
+                ? (locale === 'ru' ? 'Qloo не дал достаточно мест нужных категорий для полного маршрута; показан демо-вариант.'
+                  : locale === 'uk' ? 'Qloo не повернув достатньо місць потрібних категорій; показано демо-маршрут.'
+                  : locale === 'es' ? 'Qloo no devolvió suficientes lugares adecuados; se muestra una ruta demo.'
+                  : locale === 'zh' ? 'Qloo 未提供足够的匹配地点，因此显示演示路线。'
+                  : 'Qloo returned too few compatible venues; showing a demo route.')
+                : (locale === 'ru' ? 'Нет подходящего ответа Qloo или сервис недоступен; показан демо-маршрут.'
+                  : locale === 'uk' ? 'Немає придатної відповіді Qloo або сервіс недоступний; показано демо-маршрут.'
+                  : locale === 'es' ? 'Qloo no devolvió resultados utilizables o no estuvo disponible; se muestra una ruta demo.'
+                  : locale === 'zh' ? 'Qloo 未返回可用结果或暂不可用，因此显示演示路线。'
+                  : 'No usable Qloo result or service unavailable; showing a demo route.')}
+            </p>}
             {audit.withCoordinates >= 2
               ? <>
                   <button type="button" className="tp-map-toggle" onClick={() => setMapVisible(value => !value)}>
